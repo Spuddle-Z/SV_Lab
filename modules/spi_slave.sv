@@ -12,9 +12,10 @@ module spi_slave (
   // --- 数据与控制接口
   input  logic [31:0] tx_data,
   input  logic        tx_valid,
+  output logic        tx_ready,
 
   output logic [31:0] rx_data,
-  output logic        rx_valid,
+  output logic        rx_done,
 );
 
 // ============================================================================
@@ -57,53 +58,30 @@ end
 
 assign sample_edge = sck_synced && !sck_prev;
 assign shift_edge = !sck_synced && sck_prev;
-assign start_edge = ss_n_prev && !ss_n_synced;
-assign stop_edge = !ss_n_prev && ss_n_synced;
+assign start_edge = !ss_n_synced && ss_n_prev;
+assign stop_edge = ss_n_synced && !ss_n_prev;
 
 // ============================================================================
-// 移位寄存器与位计数器
+// 移位寄存器
 // ============================================================================
-logic [31:0] shift_reg;
-logic [4:0] bit_counter;
+logic [31:0] tx_shift_reg;
 
-// 移位寄存器：采样 MOSI（上升沿），移位输出 MISO（下降沿）
 always_ff @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
-    shift_reg <= 32'b0;
-    bit_counter <= 5'b0;
-  end else if (start_edge) begin
-    shift_reg <= tx_data;
-    bit_counter <= 5'b0;
-  end else if (!ss_n_synced && sample_edge) begin
-    // 在片选期间的上升沿采样 MOSI，低位优先左移
-    shift_reg <= {mosi_synced, shift_reg[31:1]};
-    if (bit_counter == 5'd31) begin
-      bit_counter <= 5'b0;
-    end else begin
-      bit_counter <= bit_counter + 5'd1;
-    end
+    tx_shift_reg <= 32'bz;
+    rx_shift_reg <= 32'b0;
+    tx_ready <= 1'b0;
+  end else if (start_edge && tx_valid) begin
+    tx_shift_reg <= tx_data;
+    tx_ready <= 1'b1;
+  end else if (sample_edge) begin
+    rx_data <= {mosi_synced, rx_data[31:1]};
+  end else if (shift_edge) begin
+    tx_shift_reg <= {1'bz, tx_shift_reg[31:1]};
   end
 end
 
-// 接收数据：去掉接收缓冲，直接在片选上升时把移位寄存器数据作为接收数据输出
-assign rx_data = shift_reg;
-assign rx_valid = ss_n_rising && (bit_counter != 5'b0);
-
-// ============================================================================
-// MISO 三态输出（低位优先，下降沿出数据）
-// ============================================================================
-always_ff @(posedge clk or negedge rst_n) begin
-  if (!rst_n) begin
-    miso <= 1'bz;
-  end else begin
-    if (ss_n_synced) begin
-      // 片选未选中，高阻态
-      miso <= 1'bz;
-    end else if (shift_edge) begin
-      // 下降沿输出最低位
-      miso <= shift_reg[0];
-    end
-  end
-end
+assign rx_done = stop_edge;
+assign miso = tx_shift_reg[0];
 
 endmodule
