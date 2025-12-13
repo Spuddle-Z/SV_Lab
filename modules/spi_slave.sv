@@ -1,9 +1,6 @@
 module spi_slave (
   // --- SPI 引脚（模式 0，低位先行）
-  input  logic        sck,     // SPI 时钟（CLK）
-  input  logic        ss_n,    // 片选，低有效
-  input  logic        mosi,    // 主机输出，从机输入
-  output logic        miso,    // 从机输出，主机输入
+  spi_bus.slave slave_if,
 
   // --- 系统时钟与复位
   input  logic        clk,     // 系统时钟
@@ -15,7 +12,7 @@ module spi_slave (
   output logic        tx_ready,
 
   output logic [31:0] rx_data,
-  output logic        rx_done,
+  output logic        rx_done
 );
 
 // ============================================================================
@@ -30,9 +27,9 @@ always_ff @(posedge clk or negedge rst_n) begin
     ss_n_sync  <= 3'b111;
     mosi_sync <= 3'bzzz;
   end else begin
-    sck_sync <= {sck_sync[1:0], sck};
-    ss_n_sync  <= {ss_n_sync[1:0], ss_n};
-    mosi_sync <= {mosi_sync[1:0], mosi};
+    sck_sync <= {sck_sync[1:0], slave_if.sck};
+    ss_n_sync  <= {ss_n_sync[1:0], slave_if.cs_n};
+    mosi_sync <= {mosi_sync[1:0], slave_if.mosi};
   end
 end
 
@@ -65,23 +62,30 @@ assign stop_edge = ss_n_synced && !ss_n_prev;
 // 移位寄存器
 // ============================================================================
 logic [31:0] tx_shift_reg;
+logic tx_en;
 
 always_ff @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
-    tx_shift_reg <= 32'bz;
-    rx_shift_reg <= 32'b0;
+    tx_shift_reg <= 32'b0;
     tx_ready <= 1'b0;
-  end else if (start_edge && tx_valid) begin
-    tx_shift_reg <= tx_data;
-    tx_ready <= 1'b1;
-  end else if (sample_edge) begin
-    rx_data <= {mosi_synced, rx_data[31:1]};
-  end else if (shift_edge) begin
-    tx_shift_reg <= {1'bz, tx_shift_reg[31:1]};
+    tx_en <= 1'b0;
+  end else begin
+    tx_ready <= 1'b0;
+    if (start_edge && tx_valid) begin
+      tx_shift_reg <= tx_data;
+      tx_ready <= 1'b1;
+      tx_en <= 1'b1;
+    end else if (sample_edge) begin
+      rx_data <= {mosi_synced, rx_data[31:1]};
+    end else if (shift_edge) begin
+      tx_shift_reg <= {1'b0, tx_shift_reg[31:1]};
+    end else if (stop_edge) begin
+      tx_en <= 1'b0;
+    end
   end
 end
 
 assign rx_done = stop_edge;
-assign miso = tx_shift_reg[0];
+assign slave_if.miso= tx_en ? tx_shift_reg[0] : 1'bz;
 
 endmodule
