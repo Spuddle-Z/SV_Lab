@@ -1,0 +1,9 @@
+.vscode/
+.VSCodeCounter/
+**/work/
+
+**/*.mti
+**/*.mpf
+**/*.wlf
+**/transcript
+**/*.vstf
