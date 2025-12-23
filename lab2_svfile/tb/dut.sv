@@ -9,18 +9,18 @@
 `timescale 1ns/1ps
 
 module dut (
-    spi_bus     spi,
-    uart_bus    uart
+  spi_bus   spi,
+  uart_bus  uart
 );
 // dut top
-    dut_top i_dut(
-        // input bus
-        .spi_bus(       spi.slave       ),
+  dut_top i_dut(
+    // input bus
+    .spi_bus(     spi.slave     ),
 
-        // output bus
-        .uart_bus(     uart.master     )
-    );
+    // output bus
+    .uart_bus(   uart.master   )
+  );
 
 // other testbench modules if needed
-    
+  
 endmodule

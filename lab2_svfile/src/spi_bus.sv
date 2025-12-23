@@ -17,37 +17,37 @@ interface spi_bus(input logic clk,input logic rst_n);
 
 // Signal Definition
 // =======================================
-    logic cs_n;
-    logic sck;
-    logic mosi;
-    logic miso;
+  logic cs_n;
+  logic sck;
+  logic mosi;
+  logic miso;
 
 // Clocking blocks
 // =======================================
-    clocking mst_cb @(posedge clk);
-        default input #0.25 output #0.25;
-        output cs_n;
-        output sck;
-        output mosi;
-        input miso;
-    endclocking
+  clocking mst_cb @(posedge clk);
+    default input #0.25 output #0.25;
+    output cs_n;
+    output sck;
+    output mosi;
+    input miso;
+  endclocking
 
 // Mod ports
 // =======================================
 
-    modport slave(
-        input clk,
-        input rst_n,
-        input cs_n,
-        input sck,
-        input mosi,
-        output miso
-    );
-    
-    modport master(
-        input clk,
-        input rst_n,
-        clocking mst_cb
-    );
+  modport slave(
+    input clk,
+    input rst_n,
+    input cs_n,
+    input sck,
+    input mosi,
+    output miso
+  );
+  
+  modport master(
+    input clk,
+    input rst_n,
+    clocking mst_cb
+  );
 
 endinterface:spi_bus //spi

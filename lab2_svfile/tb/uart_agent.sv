@@ -10,70 +10,70 @@
 `timescale 1ns/1ps
 
 package uart_agent_pkg;
-    import objects_pkg::*;
+  import objects_pkg::*;
 
-    // Generator: Generate data for driver to transfer
-    class uart_generator;
-        // BUILD
-        //=============================================================
-        // ...
+  // Generator: Generate data for driver to transfer
+  class uart_generator;
+    // BUILD
+    //=============================================================
+    // ...
 
-        // FUNC
-        //=============================================================
-        // ...
-    endclass //uart_generator
+    // FUNC
+    //=============================================================
+    // ...
+  endclass //uart_generator
 
-    // Driver: Converts the received packets to the format of the UART protocol
-    class uart_driver;
+  // Driver: Converts the received packets to the format of the UART protocol
+  class uart_driver;
 
-        // BUILD
-        //=============================================================
-        // ...
+    // BUILD
+    //=============================================================
+    // ...
 
-        // CONNECT
-        //=============================================================
-        // ...
+    // CONNECT
+    //=============================================================
+    // ...
 
-        // FUNC
-        //=============================================================
-        // ...
+    // FUNC
+    //=============================================================
+    // ...
 
-    endclass //uart_driver
+  endclass //uart_driver
 
-    // **Optional** 
-    // Monitor: Collect UART data and convert it to data package for
-    //          scoreboard to compare result.
-    class uart_monitor;
+  // **Optional** 
+  // Monitor: Collect UART data and convert it to data package for
+  //      scoreboard to compare result.
+  class uart_monitor;
 
-        // BUILD
-        //=============================================================
-        // ...
+    // BUILD
+    //=============================================================
+    // ...
 
-        // CONNECT
-        //=============================================================
-        // ...
+    // CONNECT
+    //=============================================================
+    // ...
 
-        // FUNC
-        //=============================================================
-        // ...
-    endclass //icb_monitor
+    // FUNC
+    //=============================================================
+    // ...
+  endclass //icb_monitor
 
-    // Agent: The top class that connects generator, driver and monitor
-    class uart_agent;
-        
-        // BUILD
-        //=============================================================
-        // ...
+  // Agent: The top class that connects generator, driver and monitor
+  class uart_agent;
+    
+    // BUILD
+    //=============================================================
+    // ...
 
-        // CONNECT
-        //=============================================================
-        // ...
+    // CONNECT
+    //=============================================================
+    // ...
 
-        // FUN : single data tran
-        //=============================================================
-        // ...
-        
-    endclass //uart_agent
+    // FUN : single data tran
+    //=============================================================
+    // ...
+    
+  endclass //uart_agent
 endpackage
 
 
