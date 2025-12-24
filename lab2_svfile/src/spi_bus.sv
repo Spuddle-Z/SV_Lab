@@ -26,28 +26,31 @@ interface spi_bus(input logic clk,input logic rst_n);
 // =======================================
   clocking mst_cb @(posedge clk);
     default input #0.25 output #0.25;
-    output cs_n;
-    output sck;
-    output mosi;
+    output cs_n, sck, mosi;
     input miso;
+  endclocking
+
+  clocking mnt_cb @(posedge clk);
+    default input #0.25 output #0.25;
+    input cs_n, sck, mosi, miso;
   endclocking
 
 // Mod ports
 // =======================================
 
   modport slave(
-    input clk,
-    input rst_n,
-    input cs_n,
-    input sck,
-    input mosi,
+    input clk, rst_n, cs_n, sck, mosi,
     output miso
   );
   
   modport master(
-    input clk,
-    input rst_n,
+    input clk, rst_n,
     clocking mst_cb
   );
+
+  modport monitor(
+    input clk, rst_n,
+    clocking mnt_cb
+  )
 
 endinterface:spi_bus //spi

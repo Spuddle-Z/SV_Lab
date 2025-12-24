@@ -10,14 +10,14 @@
 
 package objects_pkg;
   class spi_trans;
-    rand logic      read; // 0: write; 1: read
-    rand logic [15:0]   wdata;
-    rand logic [31:0]   rdata;
-    rand logic [31:0]   addr;
+    rand logic        read; // 0: write; 1: read
+    rand logic [15:0] wdata;
+    rand logic [31:0] rdata;
+    rand logic [31:0] addr;
   endclass // spi_trans
 
   class uart_trans;
-    //...
+    rand logic [15:0] wdata;
+    rand logic [15:0] rdata;
   endclass // uart_trans
 endpackage
-

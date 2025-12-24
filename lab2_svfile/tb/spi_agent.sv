@@ -30,7 +30,7 @@ package spi_agent_pkg;
     // **Optional** The random data generation can be realized here
     //=============================================================
     task automatic data_gen(
-      input       read = 1'b0,
+      input         read = 1'b0,
       input [15:0]  data = 16'h0000,
       input [31:0]  addr = 32'h2000_0000
     );
@@ -126,15 +126,60 @@ package spi_agent_pkg;
 
     // BUILD
     //=============================================================
-    // ...
+    spi_trans monitor_trans;
+    mailbox #(spi_trans) mnt2scb;
+
+    function new(
+      mailbox #(spi_trans) mnt2scb
+    );
+      this.mnt2scb = mnt2scb;
+      this.monitor_trans = new();
+    endfunction
 
     // CONNECT
     //=============================================================
-    // ...
+    local virtual spi_bus.monitor monitor_channel;
+
+    function void set_intf(
+      virtual spi_bus.monitor spi
+    );
+      this.monitor_channel = spi;
+    endfunction
 
     // FUNC
     //=============================================================
-    // ...
+    task automatic data_monitor();
+      spi_trans put_trans;
+
+      logic [31:0] tx_data;
+      logic [31:0] rx_data;
+      logic [5:0]  bit_count;
+
+      put_trans = new();
+      
+      // 等待片选信号拉低，表示传输开始
+      wait (this.monitor_channel.mnt_cb.cs_n == 1'b0);
+
+      // 采样32位数据
+      for (bit_count = 0; bit_count < 32; bit_count++) begin
+        @(posedge this.monitor_channel.mnt_cb.sck); // 在时钟上升沿采样数据
+        tx_data[bit_count] = this.monitor_channel.mnt_cb.mosi;
+        rx_data[bit_count] = this.monitor_channel.mnt_cb.miso;
+        @(negedge this.monitor_channel.mnt_cb.sck);
+      end
+
+      // 等待片选信号拉高，表示传输结束
+      wait (this.monitor_channel.mnt_cb.cs_n == 1'b1);
+
+      // 解析监听到的数据
+      put_trans.read = tx_data[31:24] == 8'h01 ? 1'b1 : 1'b0;
+      put_trans.wdata = tx_data[15:0];
+      put_trans.rdata = rx_data;
+      put_trans.addr = {24'h20_0000, tx_data[23:16]};
+
+      // 将解析后的数据发送到scoreboard
+      this.mnt2scb.put(put_trans);
+    endtask //automatic
   endclass //spi_monitor
 
   // Agent: The top class that connects generator, driver and monitor
@@ -168,12 +213,13 @@ package spi_agent_pkg;
       input [15:0]  data = 16'h0000,
       input [31:0]  addr = 32'h2000_0000
     );
-      // generate data
-      this.spi_generator.data_gen(read, data, addr);
-
-      // drive data
-      this.spi_driver.data_trans();
-        
+      fork
+        begin
+          this.spi_generator.data_gen(read, data, addr);  // generate data
+          this.spi_driver.data_trans(); // drive data
+        end
+        this.spi_monitor.data_monitor();  // monitor data
+      join
     endtask //automatic
   endclass //spi_agent
 endpackage
