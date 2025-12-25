@@ -126,14 +126,12 @@ package spi_agent_pkg;
 
     // BUILD
     //=============================================================
-    spi_trans monitor_trans;
     mailbox #(spi_trans) mnt2scb;
 
     function new(
       mailbox #(spi_trans) mnt2scb
     );
       this.mnt2scb = mnt2scb;
-      this.monitor_trans = new();
     endfunction
 
     // CONNECT
@@ -156,7 +154,7 @@ package spi_agent_pkg;
       logic [5:0]  bit_count;
 
       put_trans = new();
-      
+
       // 等待片选信号拉低，表示传输开始
       wait (this.monitor_channel.mnt_cb.cs_n == 1'b0);
 
@@ -190,11 +188,13 @@ package spi_agent_pkg;
     mailbox #(spi_trans)  gen2drv;
     spi_generator       spi_generator;
     spi_driver        spi_driver;
+    spi_monitor       spi_monitor;
 
     function new();
       this.gen2drv = new(1);
       this.spi_generator = new(this.gen2drv);
       this.spi_driver = new(this.gen2drv);
+      this.spi_monitor = new(this.mnt2scb);
     endfunction //new()
 
     // CONNECT
@@ -204,14 +204,15 @@ package spi_agent_pkg;
     );   
       // connect to spi_driver
       this.spi_driver.set_intf(spi);
+      this.spi_monitor.set_intf(spi);
     endfunction //automatic
 
     // FUN : single data tran
     //=============================================================
     task automatic single_tran(
-      input       read = 1'b1,
-      input [15:0]  data = 16'h0000,
-      input [31:0]  addr = 32'h2000_0000
+      input        read = 1'b1,
+      input [15:0] data = 16'h0000,
+      input [31:0] addr = 32'h2000_0000
     );
       fork
         begin

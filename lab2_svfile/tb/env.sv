@@ -26,12 +26,15 @@ package env;
     // first declare subordinates
     // add the uart agents
     spi_agent     spi_agent;
-    // ...
+    uart_agent    uart_agent;
 
     // new them
     function new();
-      this.spi_agent = new();
-      // ...
+      this.spi_gen2drv_mbx = new(1);
+      this.uart_gen2drv_mbx = new(1);
+
+      this.spi_agent  = new();
+      this.uart_agent = new();
     endfunction //new()
 
     // CONNECT
@@ -40,12 +43,12 @@ package env;
     // and then also connect to its subordinates
     // (only if used)
     function void set_intf(
-      virtual spi_bus   spi
-      // ...
+      virtual spi_bus   spi,
+      virtual uart_bus  uart
     );
       // connect to agent
       this.spi_agent.set_intf(spi);
-      // ...
+      this.uart_agent.set_intf(uart);
     endfunction
 
     // RUN

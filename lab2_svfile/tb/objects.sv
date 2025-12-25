@@ -17,7 +17,6 @@ package objects_pkg;
   endclass // spi_trans
 
   class uart_trans;
-    rand logic [15:0] wdata;
-    rand logic [15:0] rdata;
+    rand logic [15:0] data;
   endclass // uart_trans
 endpackage

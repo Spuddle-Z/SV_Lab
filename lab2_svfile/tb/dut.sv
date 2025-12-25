@@ -15,10 +15,10 @@ module dut (
 // dut top
   dut_top i_dut(
     // input bus
-    .spi_bus(     spi.slave     ),
+    .spi_bus(spi.slave),
 
     // output bus
-    .uart_bus(   uart.master   )
+    .uart_bus(uart.master)
   );
 
 // other testbench modules if needed
