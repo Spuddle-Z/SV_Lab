@@ -18,8 +18,8 @@ module ctrl_reg (
   input  logic        rx_fifo_ready,
 
   // UART控制信号
-  input  logic [3:0]  state,
-  output logic        baud
+  output logic [3:0]  state,
+  output logic [15:0] baud
 );
   // ============================================================================
   // 寄存器定义

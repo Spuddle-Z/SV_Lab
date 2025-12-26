@@ -55,10 +55,10 @@ package uart_agent_pkg;
 
     // CONNECT
     //=============================================================
-    local virtual uart_bus.master active_channel;
+    local virtual uart_bus.slave active_channel;
 
     function void set_intf(
-      virtual uart_bus.master uart
+      virtual uart_bus.slave uart
     );
       this.active_channel = uart;
     endfunction
@@ -69,24 +69,24 @@ package uart_agent_pkg;
       uart_trans get_trans;
 
       logic [7:0] tx_data;
-      logic [2:0]  bit_count;
+      logic [2:0] bit_count;
 
       // get the input data from mailbox
       this.gen2drv.get(get_trans);
       tx_data = get_trans.data;
 
       // 起始位
-      this.active_channel.mst_cb.tx <= 1'b0;
+      this.active_channel.slv_cb.rx <= 1'b0;
       repeat (baud_divisor * 16) @(posedge this.active_channel.clk);
 
       // 数据位
       for (bit_count = 0; bit_count < 8; bit_count++) begin
-        this.active_channel.mst_cb.tx <= tx_data[bit_count];
+        this.active_channel.slv_cb.rx <= tx_data[bit_count];
         repeat (baud_divisor * 16) @(posedge this.active_channel.clk);
       end
 
       // 停止位
-      this.active_channel.mst_cb.tx <= 1'b1;
+      this.active_channel.slv_cb.rx <= 1'b1;
       repeat (baud_divisor * 16) @(posedge this.active_channel.clk);
     endtask
 
@@ -193,7 +193,7 @@ package uart_agent_pkg;
     //=============================================================
     function void set_intf(
       virtual uart_bus uart
-    );   
+    );
       // connect to uart_driver
       this.uart_driver.set_intf(uart);
       this.uart_monitor.set_intf(uart);

@@ -21,8 +21,8 @@ module spi_ctl (
   output logic        rx_fifo_en,
   
   // UART控制信号
-  input  logic [3:0]  state,
-  output logic        baud
+  output logic [3:0]  state,
+  output logic [15:0] baud
 );
 
   // ============================================================================

@@ -19,7 +19,7 @@ module ctrl_reg (
 
   // UART控制信号
   input  logic [3:0]  state,
-  output logic        baud
+  output logic [15:0] baud
 );
   // ============================================================================
   // 寄存器定义

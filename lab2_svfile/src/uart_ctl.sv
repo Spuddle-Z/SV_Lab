@@ -17,7 +17,7 @@ module uart_ctl (
   
   // RX接口（连接到外部RX FIFO）
   output logic [15:0] rx_data,
-  output logic rx_full,
+  input logic rx_full,
   output logic rx_fifo_en
 );
 
