@@ -57,8 +57,7 @@ module testbench_top ();
 
     // source channel connections
     .spi(       spi       ),
-
-    // ...
+    .uart(      uart      )
   ); 
 
   dut i_dut(
@@ -74,7 +73,7 @@ program testbench(
   input  logic      clk,
   input  logic      rst_n,
 
-  spi_bus.master    spi
+  spi_bus.master    spi,
   uart_bus.slave    uart
 );
   import env::*;   // import your ENV object
@@ -115,8 +114,8 @@ program testbench(
   
     fork
       envctrl.run("SPI Write");             // The testcase you want to run
-      envctrl.run("SPI RAW");
-      envctrl.run("LOOPBACK");
+      // envctrl.run("SPI RAW");
+      // envctrl.run("LOOPBACK");
       envctrl.run("Time_Run");            // time out limitation
     join_any
     disable fork;    

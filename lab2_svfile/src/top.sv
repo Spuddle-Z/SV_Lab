@@ -99,7 +99,8 @@ module dut_top(
     .rx_full(rx_fifo_full),
     .rx_fifo_en(rx_fifo_wr_en),
 
-    .baud_divisor(baud)
+    .baud_divisor(baud),
+    .state(state)
   );
 
   // TX FIFO

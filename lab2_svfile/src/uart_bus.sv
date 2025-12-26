@@ -8,6 +8,8 @@
 This is only the basic interface, you may change it by your own.
 But don't change this signal description.
 */
+`timescale 1ns/1ps
+
 interface uart_bus(input logic clk,input logic rst_n);
   // Signal Definition
   // =======================================

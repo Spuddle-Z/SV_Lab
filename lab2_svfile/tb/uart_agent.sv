@@ -103,7 +103,7 @@ package uart_agent_pkg;
     mailbox #(uart_trans) smnt2scb;
 
     function new(
-      mailbox #(uart_trans) mmnt2scb
+      mailbox #(uart_trans) mmnt2scb,
       mailbox #(uart_trans) smnt2scb
     );
       this.mmnt2scb = mmnt2scb;

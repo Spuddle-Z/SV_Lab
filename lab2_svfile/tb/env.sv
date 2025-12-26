@@ -25,6 +25,8 @@ package env;
 
     // first declare subordinates
     // add the uart agents
+    mailbox #(spi_trans) spi_gen2drv_mbx;
+    mailbox #(uart_trans) uart_gen2drv_mbx;
     spi_agent     spi_agent;
     uart_agent    uart_agent;
 

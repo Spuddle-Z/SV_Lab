@@ -186,6 +186,7 @@ package spi_agent_pkg;
     // BUILD
     //=============================================================
     mailbox #(spi_trans)  gen2drv;
+    mailbox #(spi_trans)  mnt2scb;
     spi_generator       spi_generator;
     spi_driver        spi_driver;
     spi_monitor       spi_monitor;

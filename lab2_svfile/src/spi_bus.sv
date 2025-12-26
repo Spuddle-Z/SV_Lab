@@ -51,6 +51,6 @@ interface spi_bus(input logic clk,input logic rst_n);
   modport monitor(
     input clk, rst_n,
     clocking mnt_cb
-  )
+  );
 
 endinterface:spi_bus //spi
