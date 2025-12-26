@@ -37,14 +37,14 @@ module testbench_top ();
 //=====================================================================
 
   initial begin 
-  clk  = 0 ;
-  forever #(CLK_PERIOD /2) clk = ~clk;
+    clk  = 0 ;
+    forever #(CLK_PERIOD /2) clk = ~clk;
   end
 
   initial begin
-  rst_n   = 0;
-  repeat(10) @(posedge clk) ;
-  rst_n   = 1;
+    rst_n   = 0;
+    repeat(10) @(posedge clk) ;
+    rst_n   = 1;
   end
 
 //=====================================================================
@@ -74,9 +74,8 @@ program testbench(
   input  logic      clk,
   input  logic      rst_n,
 
-  spi_bus.master      spi
-  
-  // ...
+  spi_bus.master    spi
+  uart_bus.slave    uart
 );
   import env::*;   // import your ENV object
   env_ctrl envctrl; // first declare it
@@ -98,9 +97,8 @@ program testbench(
     // let your manager connected to your dut by interface
     $display("[TB- SYS ] connecting");
     envctrl.set_intf(
-      spi
-      
-      // ...
+      spi,
+      uart
     );
 
     // RUN
@@ -117,6 +115,8 @@ program testbench(
   
     fork
       envctrl.run("SPI Write");             // The testcase you want to run
+      envctrl.run("SPI RAW");
+      envctrl.run("LOOPBACK");
       envctrl.run("Time_Run");            // time out limitation
     join_any
     disable fork;    

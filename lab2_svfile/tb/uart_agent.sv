@@ -65,7 +65,7 @@ package uart_agent_pkg;
 
     // FUNC
     //=============================================================
-    task automatic data_trans(logic [15:0] baud_divisor = 16'h001B);
+    task automatic data_trans(logic [15:0] baud_divisor = 16'h0036);
       uart_trans get_trans;
 
       logic [7:0] tx_data;
@@ -123,7 +123,7 @@ package uart_agent_pkg;
     // FUNC
     //=============================================================
     task automatic mst_monitor(
-      logic [15:0] baud_divisor = 16'h001B
+      logic [15:0] baud_divisor = 16'h0036
     );
       uart_trans put_trans;
 
@@ -151,7 +151,7 @@ package uart_agent_pkg;
     endtask //mst_monitor
 
     task automatic slv_monitor(
-      logic [15:0] baud_divisor = 16'h001B
+      logic [15:0] baud_divisor = 16'h0036
     );
       uart_trans put_trans;
 
@@ -208,12 +208,12 @@ package uart_agent_pkg;
       while (1) begin
         void'(random_trans.randomize());
         fork
-          this.uart_monitor.mst_monitor();  // monitor data
-          this.uart_monitor.slv_monitor();  // monitor data
           begin
+            this.uart_monitor.mst_monitor();  // monitor data
             this.uart_generator.data_gen(random_trans.data);  // generate data
             this.uart_driver.data_trans(); // drive data
           end
+          this.uart_monitor.slv_monitor();  // monitor data
         join
         #1;
       end
