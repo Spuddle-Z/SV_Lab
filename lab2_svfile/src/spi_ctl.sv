@@ -22,6 +22,7 @@ module spi_ctl (
   
   // UART控制信号
   input  logic [3:0]  state,
+  output logic [1:0]  control,
   output logic [15:0] baud
 );
 
@@ -74,6 +75,7 @@ module spi_ctl (
     .rx_fifo_ready(reg_ready),
 
     .state(state),
+    .control(control),
     .baud(baud)
   );
 

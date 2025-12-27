@@ -19,7 +19,8 @@ module ctrl_reg (
 
   // UART控制信号
   input  logic [3:0]  state,
-  output logic [15:0] baud
+  output logic [15:0] baud,
+  output logic [1:0] control
 );
   // ============================================================================
   // 寄存器定义
@@ -103,5 +104,11 @@ module ctrl_reg (
       rx_data_reg <= rx_fifo_data;
     end
   end
+
+  // ============================================================================
+  // 输出信号赋值
+  // ============================================================================
+  assign control = control_reg;
+  assign baud = baud_reg;
 
 endmodule
