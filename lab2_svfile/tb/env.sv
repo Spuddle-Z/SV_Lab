@@ -85,9 +85,9 @@ package env;
             end
           end
 
-          "SPI RAW": begin
+          "SPI WAR": begin
             $display("=============================================================");
-            $display("[TB- ENV ] Start work : SPI RAW Test !");
+            $display("[TB- ENV ] Start work : SPI WAR Test !");
 
             $display("[TB- ENV ] Write CTRL register.");
             this.spi_agent.single_tran(1'b0, 16'h0001, CTRL_ADDR);
