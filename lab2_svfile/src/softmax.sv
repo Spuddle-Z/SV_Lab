@@ -441,62 +441,65 @@ module softmax_out (
     input  logic        tx_fifo_en   // 下游FIFO使能信号，高电平时请求读取数据
 );
 
-    // 内部数据缓冲区，存储16个16位数据
-    logic [15:0] data_buffer[15:0];
-    // 数据指针，指示下一个要发送的数据索引（0-15），当为5'd16时表示缓冲区为空
-    logic [4:0] ptr;
+  // 内部数据缓冲区，存储16个16位数据
+  logic [15:0] data_buffer[15:0];
+  // 数据指针，指示下一个要发送的数据索引（0-15），当为5'd16时表示缓冲区为空
+  logic [4:0] ptr;
 
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            // 复位初始化
-            ptr <= 5'd16;               // 指针设为16，表示缓冲区空
-            tx_empty <= 1'b1;           // 空标志置高
-            tx_data <= 16'b0;           // 输出数据清零（可选）
-            // 可选：初始化缓冲区为0，但并非必需
-            for (int i = 0; i < 16; i++) begin
-                data_buffer[i] <= 16'b0;
-            end
-        end else begin
-            // 处理valid_out信号：当valid_out为高时，加载新数据到缓冲区
-            if (valid_out) begin
-                // 将32个8位数据两两组合成16个16位数据
-                // 假设data_out[0]为第一个字节（低8位），data_out[1]为第二个字节（高8位），依此类推
-                for (int i = 0; i < 16; i++) begin
-                    data_buffer[i] <= {data_out[2*i+1], data_out[2*i]};
-                end
-                ptr <= 5'd0;            // 重置指针到缓冲区起始位置
-                tx_empty <= 1'b0;       // 缓冲区中有数据，空标志置低
-            end
-
-            if (tx_fifo_en && !tx_empty) begin
-                // 输出当前指针指向的数据
-                tx_data <= data_buffer[ptr];
-                // 指针递增，准备下一个数据
-                ptr <= ptr + 1;
-                // 检查是否所有数据都已发送
-                if (ptr == 5'd15) begin // 如果发送前指针为15，发送后缓冲区将为空
-                    tx_empty <= 1'b1;   // 缓冲区空，设置空标志
-                end
-            end
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      // 复位初始化
+      ptr <= 5'd16;               // 指针设为16，表示缓冲区空
+      tx_empty <= 1'b1;           // 空标志置高
+      tx_data <= 16'b0;           // 输出数据清零（可选）
+      // 可选：初始化缓冲区为0，但并非必需
+      for (int i = 0; i < 16; i++) begin
+        data_buffer[i] <= 16'b0;
+      end
+    end else begin
+      // 处理valid_out信号：当valid_out为高时，加载新数据到缓冲区
+      if (valid_out) begin
+        // 将32个8位数据两两组合成16个16位数据
+        // 假设data_out[0]为第一个字节（低8位），data_out[1]为第二个字节（高8位），依此类推
+        for (int i = 0; i < 16; i++) begin
+          data_buffer[i] <= {data_out[2*i+1], data_out[2*i]};
         end
+        ptr <= 5'd0;            // 重置指针到缓冲区起始位置
+        tx_empty <= 1'b0;       // 缓冲区中有数据，空标志置低
+      end
+
+      if (tx_fifo_en && !tx_empty) begin
+        // 输出当前指针指向的数据
+        tx_data <= data_buffer[ptr];
+        // 指针递增，准备下一个数据
+        ptr <= ptr + 1;
+        // 检查是否所有数据都已发送
+        if (ptr == 5'd15) begin // 如果发送前指针为15，发送后缓冲区将为空
+          tx_empty <= 1'b1;   // 缓冲区空，设置空标志
+        end
+      end
     end
+  end
 
 endmodule
 
 module softmax_top (
-    // 系统接口
-    input  logic        clk,
-    input  logic        rst_n,
-    
-    // 上游FIFO接口（连接到softmax_in）
-    input  logic [15:0] fifo_data,
-    input  logic        fifo_empty,
-    output logic        rd_en,
-    
-    // 下游FIFO接口（连接到softmax_out）
-    output logic [15:0] tx_data,
-    output logic        tx_empty,
-    input  logic        tx_fifo_en
+  // 系统接口
+  input  logic        clk,
+  input  logic        rst_n,
+  
+  // 上游FIFO接口（连接到softmax_in）
+  input  logic [15:0] fifo_data,
+  input  logic        fifo_empty,
+  output logic        rd_en,
+  
+  // 下游FIFO接口（连接到softmax_out）
+  output logic [15:0] tx_data,
+  output logic        tx_empty,
+  input  logic        tx_fifo_en,
+
+  // 控制信号
+  input  logic [1:0] control
 );
 
     // ================= 模块间连接信号 =================
@@ -512,6 +515,11 @@ module softmax_top (
     // softmax_core 内部模块信号
     logic [7:0]   unpacked_core_data_out[31:0]; // 用于信号解包
 
+    // 片选信号定义
+    logic softmax_rd_en;
+    logic [15:0] softmax_result;
+    logic softmax_result_empty;
+
     // ================= softmax_in 实例化 =================
     // 该模块从上游FIFO读取16位数据，组装成256位数据流
     softmax_in u_softmax_in (
@@ -519,7 +527,7 @@ module softmax_top (
         .rst_n     (rst_n),
         .fifo_data (fifo_data),
         .fifo_empty(fifo_empty),
-        .rd_en     (rd_en),
+        .rd_en     (softmax_rd_en),
         .data_out  (softmax_in_data_out),
         .ready     (softmax_in_ready)
     );
@@ -556,9 +564,23 @@ module softmax_top (
         .rst_n     (rst_n),
         .data_out  (softmax_core_data_out),   // 32个8位输入数据
         .valid_out (softmax_core_valid_out),  // 输入数据有效标志
-        .tx_data   (tx_data),                 // 16位输出数据
-        .tx_empty  (tx_empty),                // 输出缓冲区空标志
+        .tx_data   (softmax_result),                 // 16位输出数据
+        .tx_empty  (softmax_result_empty),                // 输出缓冲区空标志
         .tx_fifo_en(tx_fifo_en)               // 下游FIFO使能信号
     );
+
+    // ================= 直通模式逻辑 =================
+    // 当 control=00 时，直接将上游FIFO连接到下游FIFO
+    logic bypass_mode;
+    assign bypass_mode = (control == 2'b00);
+
+    // 读使能选择
+    assign rd_en = bypass_mode ? tx_fifo_en : softmax_rd_en;
+
+    // 发送数据选择
+    assign tx_data = bypass_mode ? fifo_data : softmax_result;
+
+    // 发送空标志选择
+    assign tx_empty = bypass_mode ? fifo_empty : softmax_result_empty;
 
 endmodule

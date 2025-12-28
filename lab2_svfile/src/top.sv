@@ -42,6 +42,11 @@ module dut_top(
   logic        rx_fifo_wr_en;
   logic        rx_fifo_rd_en;
 
+  // Softmax接口
+  logic        softmax_empty;
+  logic [15:0] softmax_data;
+  logic        softmax_rd_en;
+
   // 控制信号
   logic [3:0]  state;
   logic [1:0]  control;
@@ -91,15 +96,15 @@ module dut_top(
     .clk(clk),
     .rst_n(rst_n),
 
+    .fifo_data(tx_fifo_rd),
+    .fifo_empty(tx_fifo_empty),
+    .rd_en(tx_fifo_rd_en),
+
+    .tx_data(softmax_data),
+    .tx_empty(softmax_empty),
+    .tx_fifo_en(softmax_rd_en),
+
     .control(control),
-
-    .rx_fifo_data(rx_fifo_wr),
-    .rx_fifo_full(rx_fifo_full),
-    .rx_fifo_en(rx_fifo_wr_en),
-
-    .tx_fifo_data(tx_fifo_rd),
-    .tx_fifo_empty(tx_fifo_empty),
-    .tx_fifo_en(tx_fifo_rd_en)
   );
 
   // UART CTL

@@ -149,7 +149,9 @@ module softmax_top_tb;
         
         .tx_data(tx_data),
         .tx_empty(tx_empty),
-        .tx_fifo_en(tx_fifo_en)
+        .tx_fifo_en(tx_fifo_en),
+
+        .control(2'b01) // 设置为Softmax处理模式
     );
     
     // 上游FIFO数据模拟
