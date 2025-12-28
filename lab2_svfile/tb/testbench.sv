@@ -23,7 +23,7 @@ module testbench_top ();
 // Signals Declaration
 //=====================================================================
 
-  // uninterface signals 
+  // uninterface signals
   logic clk  ;
   logic rst_n;
 
@@ -53,7 +53,7 @@ module testbench_top ();
 
   testbench i_testbench(
     .clk   (    clk       ),
-    .rst_n (    rst_n       ),
+    .rst_n (    rst_n     ),
 
     // source channel connections
     .spi(       spi       ),
@@ -84,7 +84,7 @@ program testbench(
     $display("[TB- SYS ] welcome to sv testbench plateform !");
 
     // BUILD
-    //=============================================================    
+    //=============================================================
     // the first step in testbench is build your env object 
     // as your command manager, after that you can call it
     // also with its subordinates
@@ -107,11 +107,11 @@ program testbench(
 
     // (1) waiting for rst done in dut
     repeat(11) @(posedge clk);
-    
+
     // (2) add your command here 
     // example :
     //envctrl.run("SPI Write");
-  
+
     fork
       envctrl.run("SPI Write");             // The testcase you want to run
       // envctrl.run("SPI WAR");

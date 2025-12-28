@@ -181,7 +181,7 @@ package uart_agent_pkg;
 
   // Agent: The top class that connects generator, driver and monitor
   class uart_agent;
-    
+
     // BUILD
     //=============================================================
     mailbox #(uart_trans)  gen2drv;
@@ -221,5 +221,3 @@ package uart_agent_pkg;
 
   endclass //uart_agent
 endpackage
-
-

@@ -57,10 +57,10 @@ module tb_softmax_in;
   end
 
   logic [255:0] data_input;
-  logic          data_valid;
-  logic          data_ready;
-  logic [7:0]    data_output[31:0];
-  logic          core_ready;
+  logic         data_valid;
+  logic         data_ready;
+  logic [7:0]   data_output[31:0];
+  logic         core_ready;
 
   softmax_core dut_core (
     .clk(clk),
@@ -103,4 +103,130 @@ module tb_softmax_in;
     $finish;
   end
   
+endmodule
+
+module softmax_top_tb;
+
+    // 输入信号
+    logic        clk;
+    logic        rst_n;
+    logic [15:0] fifo_data;
+    logic        fifo_empty;
+    
+    // 输出信号
+    logic        rd_en;
+    logic [15:0] tx_data;
+    logic        tx_empty;
+    
+    // 测试信号
+    logic        tx_fifo_en;
+    
+    // 测试向量 - 16个16位数
+    logic [15:0] test_data [15:0] = '{
+        16'h1234, 16'h5678, 16'h9ABC, 16'hDEF0,
+        16'h1111, 16'h2222, 16'h3333, 16'h4444,
+        16'hAAAA, 16'hBBBB, 16'hCCCC, 16'hDDDD,
+        16'hEEEE, 16'hFFFF, 16'h0000, 16'h5555
+    };
+    
+    integer data_index = 0;       // 发送到DUT的数据索引
+    integer read_data_idx = 0;    // 从DUT读取的数据个数
+    logic [15:0] read_data[31:0]; // 存储从DUT读取的数据
+    
+    // 时钟生成
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk;
+    end
+    
+    // 实例化待测模块
+    softmax_top dut (
+        .clk(clk),
+        .rst_n(rst_n),
+        .fifo_data(fifo_data),
+        .fifo_empty(fifo_empty),
+        .rd_en(rd_en),
+        
+        .tx_data(tx_data),
+        .tx_empty(tx_empty),
+        .tx_fifo_en(tx_fifo_en)
+    );
+    
+    // 上游FIFO数据模拟
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            fifo_empty <= 1'b1;
+            fifo_data <= 16'h0;
+        end
+        else if (rd_en && (data_index < 16)) begin
+            // 模块读取时更新数据
+            fifo_data <= test_data[data_index];
+            data_index <= data_index + 1;
+            
+            // 如果还有数据，保持非空状态
+            fifo_empty <= (data_index == 15) ? 1'b1 : 1'b0;
+        end
+        else if (data_index >= 16) begin
+            // 所有数据已发送完毕
+            fifo_empty <= 1'b1;
+        end
+    end
+
+    // 下游FIFO读取控制
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            tx_fifo_en <= 1'b0;
+            read_data_idx <= 0;
+        end
+        else begin
+            // 当下游FIFO非空时，读取数据
+            if (!tx_empty) begin
+                tx_fifo_en <= 1'b1;
+                read_data[read_data_idx] <= tx_data;
+                read_data_idx <= read_data_idx + 1;
+                $display("Read time=%0t: data=%h (index=%0d)", 
+                         $time, tx_data, read_data_idx);
+            end
+            else begin
+                tx_fifo_en <= 1'b0;
+            end
+        end
+    end
+
+    // 主测试流程
+    initial begin
+        // 初始化
+        rst_n = 0;
+        fifo_empty = 1'b1;
+        tx_fifo_en = 1'b0;
+        
+        // 复位
+        #10 rst_n = 1;
+
+        // 设置初始FIFO数据
+        #10;
+        fifo_data = test_data[0];
+        fifo_empty = 1'b0;  // 拉低empty，表示有数据
+
+        $display("Starting test at time=%0t", $time);
+        
+        // 等待足够长时间以便处理数据
+        wait (!tx_empty);
+        #(20);
+        
+        // 打印结果
+        $display("\nTest completed:");
+        $display("Sent %0d words to DUT", data_index);
+        $display("Received %0d words from DUT", read_data_idx);
+        
+        if (read_data_idx > 0) begin
+            $display("Received data:");
+            for (int i = 0; i < read_data_idx; i++) begin
+                $display("  [%0d] = %h", i, read_data[i]);
+            end
+        end
+        
+        $finish;
+    end
+
 endmodule

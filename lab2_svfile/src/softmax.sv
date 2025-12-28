@@ -1,46 +1,98 @@
 module softmax_in (
-  input  logic     clk,
-  input  logic     rst_n,
-  input  logic [15:0]  fifo_data,
-  input  logic     fifo_empty,
-  
-  output logic     rd_en,
+  input  logic clk,
+  input  logic rst_n,
+  input  logic [15:0] fifo_data,
+  input  logic fifo_empty,
+  output logic rd_en,
   output logic [255:0] data_out,
-  output logic     ready
+  output logic ready
 );
 
   // 内部状态定义
   typedef enum logic [1:0] {
     IDLE,
     COLLECT,
-    READY
+    READY_ST
   } state_t;
 
-  state_t state;
-  logic [5:0] count;    // 计数0-7，对应8个16位数据
+  state_t state, next_state;
+  logic [5:0] count;    // 计数0-15，对应16个16位数据（256位）
 
-  // 状态转移逻辑
+  // ===== 状态寄存器 =====
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       state <= IDLE;
-      count <= 6'b0;
-      data_out <= '0;
     end else begin
-      rd_en <= 1'b0;
-      ready <= 1'b0;
-      if (!fifo_empty) begin
-        data_out <= {fifo_data, data_out[255:16]};
-        count <= count + 1'b1;
-        rd_en <= 1'b1;
-        if (count == 6'b10_0000) begin
-          state <= READY;
-          count <= 6'b0;
-          ready <= 1'b1;
-        end
-      end
+      state <= next_state;
     end
   end
+
+  // ===== 下一状态逻辑 =====
+  always_comb begin
+    case (state)
+      IDLE: begin
+        if (!fifo_empty) begin
+          next_state = COLLECT;
+        end else begin
+          next_state = IDLE;
+        end
+      end
+      
+      COLLECT: begin
+        if (!fifo_empty && count == 6'd15) begin  // 计数到15（共16次）
+          next_state = READY_ST;
+        end else begin
+          next_state = COLLECT;
+        end
+      end
+      
+      READY_ST: begin
+        next_state = IDLE;  // READY只保持一个周期
+      end
+      
+      default: begin
+        next_state = IDLE;
+      end
+    endcase
+  end
+
+  // ===== 输出逻辑 =====
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      count <= 6'b0;
+      data_out <= '0;
+      rd_en <= 1'b0;
+      ready <= 1'b0;
+    end else begin
+      // 默认值
+      rd_en <= 1'b0;
+      ready <= 1'b0;
+      
+      case (state)
+        IDLE: begin
+          count <= 6'b0;
+          data_out <= '0;
+        end
+        
+        COLLECT: begin
+          if (!fifo_empty) begin
+            // 读取数据并移位拼接
+            data_out <= {fifo_data, data_out[255:16]};
+            count <= count + 1'b1;
+            rd_en <= 1'b1;
+          end
+        end
+        
+        READY_ST: begin
+          ready <= 1'b1;  // 在READY状态输出ready=1
+          count <= 6'b0;  // 重置计数器
+        end
+      endcase
+    end
+  end
+
 endmodule
+
 
 module softmax_core #(
   parameter DATA_WIDTH = 8,
@@ -54,14 +106,13 @@ module softmax_core #(
   input logic clk,
   input logic rst_n,
   
-  // 控制信号
+  // 上游信号
   input logic enable,
   input logic signed [DATA_WIDTH*VECTOR_SIZE-1:0] data_in,
   
-  // 输出
+  // 下游信号
   output logic [DATA_WIDTH-1:0] data_out[VECTOR_SIZE-1:0],
-  output logic valid_out,
-  output logic ready
+  output logic valid_out
 );
 
   // === 内部状态定义 ===
@@ -320,18 +371,15 @@ module softmax_core #(
   // === 状态转移逻辑 ===
   always_comb begin
     next_state = state;
-    ready = 1'b1;
     
     case (state)
       IDLE: begin
         if (enable) begin
           next_state = FIND_MAX;
-          ready = 1'b0;
         end
       end
       
       FIND_MAX: begin
-        ready = 1'b0;
         if (vector_counter == VECTOR_SIZE-1) begin
           next_state = SHIFT_VALUES;
         end else begin
@@ -340,7 +388,6 @@ module softmax_core #(
       end
       
       SHIFT_VALUES: begin
-        ready = 1'b0;
         if (vector_counter == VECTOR_SIZE-1) begin
           next_state = CALC_EXP;
         end else begin
@@ -349,7 +396,6 @@ module softmax_core #(
       end
       
       CALC_EXP: begin
-        ready = 1'b0;
         if (vector_counter == VECTOR_SIZE-1 && cordic_counter == 0) begin
           next_state = CALC_SUM;
         end else begin
@@ -358,7 +404,6 @@ module softmax_core #(
       end
       
       CALC_SUM: begin
-        ready = 1'b0;
         if (vector_counter == VECTOR_SIZE-1) begin
           next_state = CALC_DIV;
         end else begin
@@ -367,7 +412,6 @@ module softmax_core #(
       end
       
       CALC_DIV: begin
-        ready = 1'b0;
         if (vector_counter == VECTOR_SIZE-1 && cordic_counter > CORDIC_ITER) begin
           next_state = IDLE;
         end else begin
@@ -377,7 +421,6 @@ module softmax_core #(
       
       default: begin
         next_state = IDLE;
-        ready = 1'b1;
       end
     endcase
   end
@@ -388,3 +431,134 @@ module softmax_core #(
   
 endmodule
 
+module softmax_out (
+    input  logic        clk,         // 时钟信号，上升沿有效
+    input  logic        rst_n,       // 复位信号，低电平有效
+    input  logic [7:0]  data_out[31:0], // 输入数据数组，32个8位数据
+    input  logic        valid_out,   // 输入数据有效指示，高电平时表示数据可用
+    output logic [15:0] tx_data,     // 输出16位数据，发送到下游
+    output logic        tx_empty,    // 输出缓冲区空指示，高电平时表示无数据可发送
+    input  logic        tx_fifo_en   // 下游FIFO使能信号，高电平时请求读取数据
+);
+
+    // 内部数据缓冲区，存储16个16位数据
+    logic [15:0] data_buffer[15:0];
+    // 数据指针，指示下一个要发送的数据索引（0-15），当为5'd16时表示缓冲区为空
+    logic [4:0] ptr;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            // 复位初始化
+            ptr <= 5'd16;               // 指针设为16，表示缓冲区空
+            tx_empty <= 1'b1;           // 空标志置高
+            tx_data <= 16'b0;           // 输出数据清零（可选）
+            // 可选：初始化缓冲区为0，但并非必需
+            for (int i = 0; i < 16; i++) begin
+                data_buffer[i] <= 16'b0;
+            end
+        end else begin
+            // 处理valid_out信号：当valid_out为高时，加载新数据到缓冲区
+            if (valid_out) begin
+                // 将32个8位数据两两组合成16个16位数据
+                // 假设data_out[0]为第一个字节（低8位），data_out[1]为第二个字节（高8位），依此类推
+                for (int i = 0; i < 16; i++) begin
+                    data_buffer[i] <= {data_out[2*i+1], data_out[2*i]};
+                end
+                ptr <= 5'd0;            // 重置指针到缓冲区起始位置
+                tx_empty <= 1'b0;       // 缓冲区中有数据，空标志置低
+            end
+
+            if (tx_fifo_en && !tx_empty) begin
+                // 输出当前指针指向的数据
+                tx_data <= data_buffer[ptr];
+                // 指针递增，准备下一个数据
+                ptr <= ptr + 1;
+                // 检查是否所有数据都已发送
+                if (ptr == 5'd15) begin // 如果发送前指针为15，发送后缓冲区将为空
+                    tx_empty <= 1'b1;   // 缓冲区空，设置空标志
+                end
+            end
+        end
+    end
+
+endmodule
+
+module softmax_top (
+    // 系统接口
+    input  logic        clk,
+    input  logic        rst_n,
+    
+    // 上游FIFO接口（连接到softmax_in）
+    input  logic [15:0] fifo_data,
+    input  logic        fifo_empty,
+    output logic        rd_en,
+    
+    // 下游FIFO接口（连接到softmax_out）
+    output logic [15:0] tx_data,
+    output logic        tx_empty,
+    input  logic        tx_fifo_en
+);
+
+    // ================= 模块间连接信号 =================
+    
+    // softmax_in 到 softmax_core 的信号
+    logic [255:0] softmax_in_data_out;   // 256位输出数据
+    logic         softmax_in_ready;      // 数据准备好标志
+    
+    // softmax_core 到 softmax_out 的信号
+    logic [7:0]   softmax_core_data_out[31:0];  // 32个8位输出数据
+    logic         softmax_core_valid_out;       // 输出有效标志
+    
+    // softmax_core 内部模块信号
+    logic [7:0]   unpacked_core_data_out[31:0]; // 用于信号解包
+
+    // ================= softmax_in 实例化 =================
+    // 该模块从上游FIFO读取16位数据，组装成256位数据流
+    softmax_in u_softmax_in (
+        .clk       (clk),
+        .rst_n     (rst_n),
+        .fifo_data (fifo_data),
+        .fifo_empty(fifo_empty),
+        .rd_en     (rd_en),
+        .data_out  (softmax_in_data_out),
+        .ready     (softmax_in_ready)
+    );
+
+    // ================= softmax_core 实例化 =================
+    // 该模块执行softmax计算，接受256位输入，输出32个8位数据
+    softmax_core #(
+        .DATA_WIDTH        (8),
+        .VECTOR_SIZE       (32),
+        .CORDIC_ITER       (16),
+        .CORDIC_WIDTH      (18),
+        .ACC_WIDTH         (20),
+        .FIXED_POINT_FRAC  (12)
+    ) u_softmax_core (
+        .clk      (clk),
+        .rst_n    (rst_n),
+        .enable   (softmax_in_ready),         // softmax_in准备就绪时启动计算
+        .data_in  (softmax_in_data_out),      // 256位输入数据
+        .data_out (unpacked_core_data_out),   // 32个8位输出数据
+        .valid_out(softmax_core_valid_out)    // 计算结果有效标志
+    );
+
+    // 将解包的数组信号分配给连接信号
+    generate
+        for (genvar i = 0; i < 32; i++) begin : assign_data_out
+            assign softmax_core_data_out[i] = unpacked_core_data_out[i];
+        end
+    endgenerate
+
+    // ================= softmax_out 实例化 =================
+    // 该模块将32个8位数据转换成16位数据流输出
+    softmax_out u_softmax_out (
+        .clk       (clk),
+        .rst_n     (rst_n),
+        .data_out  (softmax_core_data_out),   // 32个8位输入数据
+        .valid_out (softmax_core_valid_out),  // 输入数据有效标志
+        .tx_data   (tx_data),                 // 16位输出数据
+        .tx_empty  (tx_empty),                // 输出缓冲区空标志
+        .tx_fifo_en(tx_fifo_en)               // 下游FIFO使能信号
+    );
+
+endmodule
