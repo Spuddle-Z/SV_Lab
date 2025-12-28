@@ -104,7 +104,7 @@ module dut_top(
     .tx_empty(softmax_empty),
     .tx_fifo_en(softmax_rd_en),
 
-    .control(control),
+    .control(control)
   );
 
   // UART CTL

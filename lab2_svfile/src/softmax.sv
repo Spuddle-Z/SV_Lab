@@ -302,14 +302,15 @@ module softmax_core #(
               
               if (cordic_counter == CORDIC_ITER) begin
                 // CORDIC计算完成
-                exp_values[vector_counter] <= (cordic_x + cordic_y) >>> (FIXED_POINT_FRAC - (ACC_WIDTH - CORDIC_WIDTH));
+                // exp_values[vector_counter] <= (cordic_x + cordic_y) >>> (FIXED_POINT_FRAC - (ACC_WIDTH - CORDIC_WIDTH));
+                exp_values[vector_counter] <= cordic_x + cordic_y;
                 vector_counter <= vector_counter + 1;
                 cordic_counter <= 0;
               end
             end
           end
         end
-        
+
         CALC_SUM: begin
           // 计算指数和
           if (vector_counter == 0) begin

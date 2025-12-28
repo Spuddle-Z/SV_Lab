@@ -13,12 +13,12 @@ module tb_softmax_in;
   
   // 测试向量 - 16个16位数
   logic [15:0] test_data [15:0] = '{
-    16'h1234, 16'h5678, 16'h9ABC, 16'hDEF0,
-    16'h1111, 16'h2222, 16'h3333, 16'h4444,
-    16'hAAAA, 16'hBBBB, 16'hCCCC, 16'hDDDD,
-    16'hEEEE, 16'hFFFF, 16'h0000, 16'h5555
+      16'h0001, 16'h0384, 16'h0FA0, 16'h2710,
+      16'h4E20, 16'h7530, 16'h9C40, 16'hC350,
+      16'hEA60, 16'h1117, 16'h3875, 16'h5F8B,
+      16'h8692, 16'hADB3, 16'hD4D5, 16'hFBEF
   };
-  
+
   integer data_index = 0; // 数据索引
   
   // 时钟生成
@@ -123,12 +123,12 @@ module softmax_top_tb;
     
     // 测试向量 - 16个16位数
     logic [15:0] test_data [15:0] = '{
-        16'h1234, 16'h5678, 16'h9ABC, 16'hDEF0,
-        16'h1111, 16'h2222, 16'h3333, 16'h4444,
-        16'hAAAA, 16'hBBBB, 16'hCCCC, 16'hDDDD,
-        16'hEEEE, 16'hFFFF, 16'h0000, 16'h5555
+        16'h0001, 16'h0384, 16'h0FA0, 16'h2710,
+        16'h4E20, 16'h7530, 16'h9C40, 16'hC350,
+        16'hEA60, 16'h1117, 16'h3875, 16'h5F8B,
+        16'h8692, 16'hADB3, 16'hD4D5, 16'hFBEF
     };
-    
+
     integer data_index = 0;       // 发送到DUT的数据索引
     integer read_data_idx = 0;    // 从DUT读取的数据个数
     logic [15:0] read_data[31:0]; // 存储从DUT读取的数据
