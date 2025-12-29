@@ -91,7 +91,7 @@ package spi_agent_pkg;
       if (get_trans.read) begin
         tx_data = {8'h01, get_trans.addr[7:0], 16'h0000};
       end else begin
-        tx_data = {8'h00, get_trans.addr[7:0], get_trans.wdata[15:0]};
+        tx_data = {8'h00, get_trans.addr[7:0], get_trans.wdata};
       end
 
       // setup the transaction
@@ -99,7 +99,7 @@ package spi_agent_pkg;
 
       @(this.active_channel.mst_cb);
       for (bit_count = 0; bit_count < 32; bit_count++) begin
-        this.active_channel.mst_cb.mosi <= tx_data[31 - bit_count];
+        this.active_channel.mst_cb.mosi <= tx_data[bit_count];
 
         @(this.active_channel.mst_cb);
         this.active_channel.mst_cb.sck <= 1'b1;
@@ -176,7 +176,7 @@ package spi_agent_pkg;
       put_trans.addr = {24'h20_0000, tx_data[23:16]};
 
       // 将解析后的数据发送到scoreboard
-      this.mnt2scb.put(put_trans);
+      // this.mnt2scb.put(put_trans);
     endtask //automatic
   endclass //spi_monitor
 

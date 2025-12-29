@@ -115,9 +115,9 @@ module dut_top(
     .tx(uart_tx),
     .rx(uart_rx),
 
-    .tx_data(tx_fifo_rd),
-    .tx_empty(tx_fifo_empty),
-    .tx_fifo_en(tx_fifo_rd_en),
+    .tx_data(softmax_data),
+    .tx_empty(softmax_empty),
+    .tx_fifo_en(softmax_rd_en),
     .rx_data(rx_fifo_wr),
     .rx_full(rx_fifo_full),
     .rx_fifo_en(rx_fifo_wr_en),

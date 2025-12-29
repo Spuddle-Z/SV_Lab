@@ -4,30 +4,63 @@ module spi_assertion (
   spi_bus.monitor   spi
 );
 
-  bit cmd;
-
-  always_ff @(spi.clk) begin
-    if (spi.spi_cmd_valid && spi.spi_cmd_ready)
-      cmd <= spi.spi_cmd_read;
-    else
-      cmd <= cmd;
-  end
-
-// Signal X Assertion
-  property spi_cmd_valid_no_x_check;
+  // Signal X Assertion
+  property spi_sck_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    not ($isunknown(spi.spi_cmd_valid));
+    !spi.mnt_cb.cs_n |-> not ($isunknown(spi.mnt_cb.sck));
   endproperty
 
-  property spi_cmd_ready_no_x_check;
+  property spi_mosi_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    not ($isunknown(spi.spi_cmd_ready));
+    !spi.mnt_cb.cs_n |-> not ($isunknown(spi.mnt_cb.mosi));
   endproperty
 
-  property spi_cmd_addr_no_x_check;
+  property spi_miso_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    spi.spi_cmd_valid |-> (not ($isunknown(spi.spi_cmd_addr)));
+    !spi.mnt_cb.cs_n |-> not ($isunknown(spi.mnt_cb.miso));
   endproperty
+
+  check_spi_sck_no_x: assert property (spi_sck_no_x_check)
+    else $error($stime, "\t\t FATAL: SPI SCK exists X when CS_N is low!\n");
+
+  check_spi_mosi_no_x: assert property (spi_mosi_no_x_check)
+    else $error($stime, "\t\t FATAL: SPI MOSI exists X when CS_N is low!\n");
+
+  check_spi_miso_no_x: assert property (spi_miso_no_x_check)
+    else $error($stime, "\t\t FATAL: SPI MISO exists X when CS_N is low!\n");
+
+  property spi_ss_no_x_check;
+    @(posedge spi.clk) disable iff(!spi.rst_n)
+    not ($isunknown(spi.mnt_cb.cs_n));
+  endproperty
+
+  check_spi_ss_no_x: assert property (spi_ss_no_x_check)
+    else $error($stime, "\t\t FATAL: SPI CS_N exists X!\n");
+
+  // SPI CPOL与CPHA检查
+  property spi_cpol_sck_check;
+    @(negedge spi.mnt_cb.cs_n) disable iff(!spi.rst_n)
+    spi.mnt_cb.sck == 1'b0;
+  endproperty
+
+  property spi_mosi_stable_check;
+    @(posedge spi.mnt_cb.sck) disable iff(!spi.rst_n || spi.mnt_cb.cs_n)
+    $stable(spi.mnt_cb.mosi);
+
+  check_spi_cpol_sck: assert property (spi_cpol_sck_check)
+    else $error($stime, "\t\t FATAL: SPI CPOL check failed! SCK should be low when CS_N goes low!\n");
+
+
+
+
+
+
+
+
+
+
+
+
 
   property spi_cmd_read_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
@@ -142,5 +175,14 @@ module spi_assertion (
 
   check_spi_cmd_handshake: assert property (spi_cmd_handshake_check) else $error($stime, "\t\t FATAL: spi CMD Channel does not handshake!\n");
   check_spi_rsp_handshake: assert property (spi_rsp_handshake_check) else $error($stime, "\t\t FATAL: spi RSP Channel does not handshake!\n");
+
+  bit cmd;
+
+  always_ff @(spi.clk) begin
+    if (spi.spi_cmd_valid && spi.spi_cmd_ready)
+      cmd <= spi.spi_cmd_read;
+    else
+      cmd <= cmd;
+  end
   
 endmodule

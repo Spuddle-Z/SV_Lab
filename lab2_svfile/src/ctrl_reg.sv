@@ -78,13 +78,13 @@ module ctrl_reg (
             endcase
           end
           8'h01: begin
+            rx_reg_valid <= 1'b1;
             case (addr)
               CONTROL: spi_tx_data <= {30'b0, control_reg};
               STATE: spi_tx_data <= {28'b0, state_reg};
               RX_DATA: begin
                 spi_tx_data <= rx_data_reg;
                 rx_fifo_en <= 1'b1;
-                rx_reg_valid <= 1'b1;
               end
               BAUD: spi_tx_data <= {16'b0, baud_reg};
             endcase

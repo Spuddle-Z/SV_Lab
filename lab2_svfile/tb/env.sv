@@ -65,80 +65,79 @@ package env;
       localparam  RXDATA_ADDR = 32'h2000_0018;
       localparam  BAUD_ADDR   = 32'h2000_0020;
 
-      fork
-        this.uart_agent.single_channel_agent();
+      case (state)
+        "SPI Write": begin
+          $display("=============================================================");
+          $display("[TB- ENV ] Start work : SPI Write !");
 
-        case (state)
-          "SPI Write": begin
-            $display("=============================================================");
-            $display("[TB- ENV ] Start work : SPI Write !");
+          $display("[TB- ENV ] Write CTRL register.");
+          this.spi_agent.single_tran(1'b0, 16'habcd, CTRL_ADDR);
 
-            $display("[TB- ENV ] Write CTRL register.");
-            this.spi_agent.single_tran(1'b0, 16'habcd, CTRL_ADDR);
+          $display("[TB- ENV ] Write BAUD register.");
+          this.spi_agent.single_tran(1'b0, 16'h0036, BAUD_ADDR);
 
-            $display("[TB- ENV ] Write BAUD register.");
-            this.spi_agent.single_tran(1'b0, 16'h0036, BAUD_ADDR);
-
-            $display("[TB- ENV ] Write WDATA register for fifo depth.");
-            for (int i = 0; i < 8; i = i + 1) begin
-              this.spi_agent.single_tran(1'b0, 16'hf0f0, TXDATA_ADDR);
-            end
+          $display("[TB- ENV ] Write WDATA register for fifo depth.");
+          for (int i = 0; i < 8; i = i + 1) begin
+            this.spi_agent.single_tran(1'b0, 16'hf0f0, TXDATA_ADDR);
           end
+        end
 
-          "SPI WAR": begin
-            $display("=============================================================");
-            $display("[TB- ENV ] Start work : SPI WAR Test !");
+        "SPI WAR": begin
+          $display("=============================================================");
+          $display("[TB- ENV ] Start work : SPI WAR Test !");
 
-            $display("[TB- ENV ] Write CTRL register.");
-            this.spi_agent.single_tran(1'b0, 16'h0001, CTRL_ADDR);
-            $display("[TB- ENV ] Read CTRL register.");
-            this.spi_agent.single_tran(1'b1, 16'h0000, CTRL_ADDR);
+          $display("[TB- ENV ] Write CTRL register.");
+          this.spi_agent.single_tran(1'b0, 16'h0001, CTRL_ADDR);
+          $display("[TB- ENV ] Read CTRL register.");
+          this.spi_agent.single_tran(1'b1, 16'h0000, CTRL_ADDR);
 
-            $display("[TB- ENV ] Write BAUD register.");
-            this.spi_agent.single_tran(1'b0, 16'h0036, BAUD_ADDR);
-            $display("[TB- ENV ] Read BAUD register.");
-            this.spi_agent.single_tran(1'b1, 16'h0000, BAUD_ADDR);
-          end
+          $display("[TB- ENV ] Write BAUD register.");
+          this.spi_agent.single_tran(1'b0, 16'h0036, BAUD_ADDR);
+          $display("[TB- ENV ] Read BAUD register.");
+          this.spi_agent.single_tran(1'b1, 16'h0000, BAUD_ADDR);
 
-          "LOOPBACK": begin
-            $display("=============================================================");
-            $display("[TB- ENV ] Start work : LOOPBACK Test !");
+          $display("[TB- ENV ] Accept data from register.");
+          this.spi_agent.single_tran(1'b0, 16'h00ff, TXDATA_ADDR);
+        end
 
-            $display("[TB- ENV ] Write CTRL register.");
-            this.spi_agent.single_tran(1'b0, 16'habcd, CTRL_ADDR);
+        "LOOPBACK": begin
+          $display("=============================================================");
+          $display("[TB- ENV ] Start work : LOOPBACK Test !");
 
-            $display("[TB- ENV ] Write BAUD register.");
-            this.spi_agent.single_tran(1'b0, 16'h0036, BAUD_ADDR);
+          $display("[TB- ENV ] Write CTRL register.");
+          this.spi_agent.single_tran(1'b0, 16'habcd, CTRL_ADDR);
 
-            $display("[TB- ENV ] Write WDATA register for fifo depth.");
-            fork
-              begin
-                for (int i = 0; i < 8; i = i + 1) begin
-                  this.spi_agent.single_tran(1'b0, 16'hf0f0, TXDATA_ADDR);
-                end
-                while (1) begin
-                  this.spi_agent.single_tran(1'b1, 16'h0000, RXDATA_ADDR);
-                end
+          $display("[TB- ENV ] Write BAUD register.");
+          this.spi_agent.single_tran(1'b0, 16'h0036, BAUD_ADDR);
+
+          $display("[TB- ENV ] Write WDATA register for fifo depth.");
+          fork
+            begin
+              for (int i = 0; i < 8; i = i + 1) begin
+                this.spi_agent.single_tran(1'b0, 16'hf0f0, TXDATA_ADDR);
               end
-              this.uart_agent.single_channel_agent();
-            join_any
-          end
+              while (1) begin
+                this.spi_agent.single_tran(1'b1, 16'h0000, RXDATA_ADDR);
+              end
+            end
+            this.uart_agent.single_channel_agent();
+          join_any
+        end
 
-          "Time_Run": begin
-            $display("[TB- ENV ] start work : Time_Run !");
-            #100000;
-            $display("[TB- ENV ] =========================================================================================");
-            $display("[TB- ENV ]  _|_|_|_|_|   _|_|_|   _|      _|   _|_|_|_|         _|_|     _|    _|   _|_|_|_|_|  ");
-            $display("[TB- ENV ]      _|         _|     _|_|  _|_|   _|             _|    _|   _|    _|       _|      ");
-            $display("[TB- ENV ]      _|         _|     _|  _|  _|   _|_|_|         _|    _|   _|    _|       _|      ");
-            $display("[TB- ENV ]      _|         _|     _|      _|   _|             _|    _|   _|    _|       _|      ");
-            $display("[TB- ENV ]      _|       _|_|_|   _|      _|   _|_|_|_|         _|_|       _|_|         _|      ");
-            $display("[TB- ENV ] =========================================================================================");
-          end
-          default: begin
-          end
-        endcase
-      join
+        "Time_Run": begin
+          $display("[TB- ENV ] start work : Time_Run !");
+          #100000;
+          $display("[TB- ENV ] =========================================================================================");
+          $display("[TB- ENV ]  _|_|_|_|_|   _|_|_|   _|      _|   _|_|_|_|         _|_|     _|    _|   _|_|_|_|_|  ");
+          $display("[TB- ENV ]      _|         _|     _|_|  _|_|   _|             _|    _|   _|    _|       _|      ");
+          $display("[TB- ENV ]      _|         _|     _|  _|  _|   _|_|_|         _|    _|   _|    _|       _|      ");
+          $display("[TB- ENV ]      _|         _|     _|      _|   _|             _|    _|   _|    _|       _|      ");
+          $display("[TB- ENV ]      _|       _|_|_|   _|      _|   _|_|_|_|         _|_|       _|_|         _|      ");
+          $display("[TB- ENV ] =========================================================================================");
+        end
+        default: begin
+        end
+      endcase
     endtask
   endclass //env_ctrl
 endpackage

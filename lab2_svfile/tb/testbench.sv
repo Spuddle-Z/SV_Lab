@@ -113,9 +113,9 @@ program testbench(
     //envctrl.run("SPI Write");
 
     fork
-      envctrl.run("SPI Write");             // The testcase you want to run
+      // envctrl.run("SPI Write");             // The testcase you want to run
       // envctrl.run("SPI WAR");
-      // envctrl.run("LOOPBACK");
+      envctrl.run("LOOPBACK");
       envctrl.run("Time_Run");            // time out limitation
     join_any
     disable fork;    

@@ -185,9 +185,18 @@ package uart_agent_pkg;
     // BUILD
     //=============================================================
     mailbox #(uart_trans)  gen2drv;
+    mailbox #(uart_trans)  mmnt2scb;
+    mailbox #(uart_trans)  smnt2scb;
     uart_generator       uart_generator;
     uart_driver        uart_driver;
     uart_monitor       uart_monitor;
+
+    function new();
+      this.gen2drv = new(1);
+      this.uart_generator = new(this.gen2drv);
+      this.uart_driver = new(this.gen2drv);
+      this.uart_monitor = new(this.mmnt2scb, this.smnt2scb);
+    endfunction //new()
 
     // CONNECT
     //=============================================================
@@ -206,6 +215,7 @@ package uart_agent_pkg;
       random_trans = new();
 
       while (1) begin
+        $display("[TB- UART ] Waiting for data to transfer...");
         void'(random_trans.randomize());
         fork
           begin
