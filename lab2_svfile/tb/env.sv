@@ -105,7 +105,7 @@ package env;
           $display("[TB- ENV ] Start work : LOOPBACK Test !");
 
           $display("[TB- ENV ] Write CTRL register.");
-          this.spi_agent.single_tran(1'b0, 16'habcd, CTRL_ADDR);
+          this.spi_agent.single_tran(1'b0, 16'h0000, CTRL_ADDR);
 
           $display("[TB- ENV ] Write BAUD register.");
           this.spi_agent.single_tran(1'b0, 16'h0036, BAUD_ADDR);
@@ -113,8 +113,8 @@ package env;
           $display("[TB- ENV ] Write WDATA register for fifo depth.");
           fork
             begin
-              for (int i = 0; i < 8; i = i + 1) begin
-                this.spi_agent.single_tran(1'b0, 16'hf0f0, TXDATA_ADDR);
+              for (int i = 0; i < 10; i = i + 1) begin
+                this.spi_agent.single_tran(1'b0, 16'hf0f0 + i, TXDATA_ADDR);
               end
               while (1) begin
                 this.spi_agent.single_tran(1'b1, 16'h0000, RXDATA_ADDR);
@@ -126,7 +126,7 @@ package env;
 
         "Time_Run": begin
           $display("[TB- ENV ] start work : Time_Run !");
-          #100000;
+          #100000000;
           $display("[TB- ENV ] =========================================================================================");
           $display("[TB- ENV ]  _|_|_|_|_|   _|_|_|   _|      _|   _|_|_|_|         _|_|     _|    _|   _|_|_|_|_|  ");
           $display("[TB- ENV ]      _|         _|     _|_|  _|_|   _|             _|    _|   _|    _|       _|      ");

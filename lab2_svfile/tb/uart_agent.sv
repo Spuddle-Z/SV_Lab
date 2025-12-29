@@ -128,35 +128,6 @@ package uart_agent_pkg;
       uart_trans put_trans;
 
       logic [7:0] data;
-      logic [2:0] bit_count;
-
-      put_trans = new();
-
-      // wait for start bit
-      @(negedge this.monitor_channel.mnt_cb.rx);
-      repeat (baud_divisor * 24) @(posedge this.monitor_channel.clk); // mid bit
-
-      // data bits
-      for (bit_count = 0; bit_count < 8; bit_count++) begin
-        data[bit_count] = this.monitor_channel.mnt_cb.rx;
-        repeat (baud_divisor * 16) @(posedge this.monitor_channel.clk);
-      end
-
-      // stop bit
-      repeat (baud_divisor * 16) @(posedge this.monitor_channel.clk);
-
-      // put the received data into mailbox
-      put_trans.data = data;
-      this.mmnt2scb.put(put_trans);
-    endtask //mst_monitor
-
-    task automatic slv_monitor(
-      logic [15:0] baud_divisor = 16'h0036
-    );
-      uart_trans put_trans;
-
-      logic [7:0] data;
-      logic [2:0] bit_count;
 
       put_trans = new();
 
@@ -165,7 +136,7 @@ package uart_agent_pkg;
       repeat (baud_divisor * 24) @(posedge this.monitor_channel.clk); // mid bit
 
       // data bits
-      for (bit_count = 0; bit_count < 8; bit_count++) begin
+      for (integer bit_count = 0; bit_count < 8; bit_count++) begin
         data[bit_count] = this.monitor_channel.mnt_cb.tx;
         repeat (baud_divisor * 16) @(posedge this.monitor_channel.clk);
       end
@@ -173,9 +144,30 @@ package uart_agent_pkg;
       // stop bit
       repeat (baud_divisor * 16) @(posedge this.monitor_channel.clk);
 
-      // put the received data into mailbox
-      put_trans.data = data;
-      this.smnt2scb.put(put_trans);
+    endtask //mst_monitor
+
+    task automatic slv_monitor(
+      logic [15:0] baud_divisor = 16'h0036
+    );
+      uart_trans put_trans;
+
+      logic [7:0] data;
+
+      put_trans = new();
+
+      // wait for start bit
+      @(negedge this.monitor_channel.mnt_cb.rx);
+      repeat (baud_divisor * 24) @(posedge this.monitor_channel.clk); // mid bit
+
+      // data bits
+      for (integer bit_count = 0; bit_count < 8; bit_count++) begin
+        data[bit_count] = this.monitor_channel.mnt_cb.rx;
+        repeat (baud_divisor * 16) @(posedge this.monitor_channel.clk);
+      end
+
+      // stop bit
+      repeat (baud_divisor * 16) @(posedge this.monitor_channel.clk);
+
     endtask //mst_monitor
   endclass
 
@@ -215,7 +207,6 @@ package uart_agent_pkg;
       random_trans = new();
 
       while (1) begin
-        $display("[TB- UART ] Waiting for data to transfer...");
         void'(random_trans.randomize());
         fork
           begin
