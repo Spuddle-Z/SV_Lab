@@ -5,7 +5,7 @@
 // Revision History
 // V0 date:2025/11/01 Initial version, zzz-jy@sjtu.edu.cn
 //=====================================================================
-
+`include "../define.sv"
 `timescale 1ns/1ps
 
 module dut (
@@ -21,6 +21,8 @@ module dut (
     .uart_bus(uart.master)
   );
 
-// other testbench modules if needed
-  
+  `ifdef SVA
+    binding_module i_binding_module();
+  `endif
+
 endmodule

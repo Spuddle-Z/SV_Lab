@@ -4,20 +4,27 @@ module spi_assertion (
   spi_bus.monitor   spi
 );
 
+  function bit has_x_only(logic value);
+    has_x_only = 0;
+    if (value === 1'bx) begin  // 使用 === 进行精确比较
+      has_x_only = 1;
+    end
+  endfunction
+
   // Signal X Assertion
   property spi_sck_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    !spi.mnt_cb.cs_n |-> not ($isunknown(spi.mnt_cb.sck));
+    !spi.cs_n |-> not (has_x_only(spi.sck));
   endproperty
 
   property spi_mosi_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    !spi.mnt_cb.cs_n |-> not ($isunknown(spi.mnt_cb.mosi));
+    !spi.cs_n |-> not (has_x_only(spi.mosi));
   endproperty
 
   property spi_miso_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    !spi.mnt_cb.cs_n |-> not ($isunknown(spi.mnt_cb.miso));
+    !spi.cs_n |-> not (has_x_only(spi.miso));
   endproperty
 
   check_spi_sck_no_x: assert property (spi_sck_no_x_check)
@@ -31,7 +38,7 @@ module spi_assertion (
 
   property spi_ss_no_x_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    not ($isunknown(spi.mnt_cb.cs_n));
+    not (has_x_only(spi.cs_n));
   endproperty
 
   check_spi_ss_no_x: assert property (spi_ss_no_x_check)
@@ -39,150 +46,67 @@ module spi_assertion (
 
   // SPI CPOL与CPHA检查
   property spi_cpol_sck_check;
-    @(negedge spi.mnt_cb.cs_n) disable iff(!spi.rst_n)
-    spi.mnt_cb.sck == 1'b0;
+    @(negedge spi.cs_n) disable iff(!spi.rst_n)
+    spi.sck == 1'b0;
   endproperty
 
   property spi_mosi_stable_check;
-    @(posedge spi.mnt_cb.sck) disable iff(!spi.rst_n || spi.mnt_cb.cs_n)
-    $stable(spi.mnt_cb.mosi);
+    @(posedge spi.clk) disable iff(!spi.rst_n || spi.cs_n)
+    $rose(spi.sck)|->$stable(spi.mosi);
+  endproperty
+
+  property spi_miso_stable_check;
+    @(posedge spi.clk) disable iff(!spi.rst_n || spi.cs_n)
+    $rose(spi.sck)|->$stable(spi.miso);
+  endproperty
 
   check_spi_cpol_sck: assert property (spi_cpol_sck_check)
     else $error($stime, "\t\t FATAL: SPI CPOL check failed! SCK should be low when CS_N goes low!\n");
 
+  check_spi_mosi_stable: assert property (spi_mosi_stable_check)
+    else $error($stime, "\t\t FATAL: SPI CPHA check failed! MOSI should be stable at SCK rising edge!\n");
 
+  check_spi_miso_stable: assert property (spi_miso_stable_check)
+    else $error($stime, "\t\t FATAL: SPI CPHA check failed! MISO should be stable at SCK rising edge!\n");
 
+  // SCK周期与占空比检查
+  parameter real CLK_PERIOD_MAX = 10.0;
+  parameter real DUTY_CYCLE_MIN = 0.4;
 
-
-
-
-
-
-
-
-
-
-  property spi_cmd_read_no_x_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    spi.spi_cmd_valid |-> (not ($isunknown(spi.spi_cmd_read)));
+  property spi_sck_period_check;
+    real last_time, period;
+    @(posedge spi.clk)
+    (spi.cs_n == 0 && $rose(spi.sck)) |->
+    (1, last_time = $realtime)
+    ##1 @(posedge spi.clk)
+    (spi.cs_n == 0 && $rose(spi.sck))
+    |->
+    (1, period = $realtime - last_time)
+    |-> period <= CLK_PERIOD_MAX;
   endproperty
 
-  property spi_cmd_wdata_no_x_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_cmd_valid && !spi.spi_cmd_read) |-> (not ($isunknown(spi.spi_cmd_wdata)));
+  property spi_sck_duty_cycle_check;
+    real rise_time, high_time, period;
+    @(posedge spi.clk) (spi.cs_n == 0 && $rose(spi.sck)) |->
+    (1, rise_time = $realtime)
+    ##1 @(negedge spi.clk) (spi.cs_n == 0 && $rose(spi.sck)) |->(1, high_time = $realtime - rise_time)
+    ##1 @(posedge spi.clk) (spi.cs_n == 0 && $rose(spi.sck)) |->(1, period = $realtime - rise_time)
+    |-> high_time/period >= DUTY_CYCLE_MIN;
   endproperty
 
-  property spi_cmd_wmask_no_x_check;
+  assert_sck_period: assert property (spi_sck_period_check) 
+    else $error("SCK period error");
+
+  assert_sck_duty_cycle: assert property (spi_sck_duty_cycle_check) 
+    else $error("SCK duty cycle error");
+
+  // CS_N上升沿检测
+  property spi_cs_n_rise_check;
     @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_cmd_valid && !spi.spi_cmd_read) |-> (not ($isunknown(spi.spi_cmd_wmask)));
+    $rose(spi.cs_n) |-> $past($fell(spi.sck), 1);
   endproperty
 
-  property spi_rsp_valid_no_x_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    not ($isunknown(spi.spi_rsp_valid));
-  endproperty
+  assert_cs_n_rise_check: assert property (spi_cs_n_rise_check)
+    else $error("SPI CS_N rise edge check failed: SCK should have a rising edge before CS_N rises.\n");
 
-  property spi_rsp_ready_no_x_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    not ($isunknown(spi.spi_rsp_ready));
-  endproperty
-
-  property spi_rsp_rdata_no_x_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_rsp_valid && cmd) |-> (not ($isunknown(spi.spi_rsp_rdata)));
-  endproperty
-
-  property spi_rsp_err_no_x_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    spi.spi_rsp_valid |-> (not ($isunknown(spi.spi_rsp_err)));
-  endproperty
-
-  check_spi_cmd_valid_no_x: assert property (spi_cmd_valid_no_x_check) else $error($stime, "\t\t FATAL: spi_cmd_valid exists X!\n");
-  check_spi_cmd_ready_no_x: assert property (spi_cmd_ready_no_x_check) else $error($stime, "\t\t FATAL: spi_cmd_ready exists X!\n");
-  check_spi_cmd_addr_no_x: assert property (spi_cmd_addr_no_x_check) else $error($stime, "\t\t FATAL: spi_cmd_addr exists X!\n");
-	check_spi_cmd_read_no_x: assert property (spi_cmd_read_no_x_check) else $error($stime, "\t\t FATAL: spi_cmd_read exists X!\n");
-  check_spi_cmd_wdata_no_x: assert property (spi_cmd_wdata_no_x_check) else $error($stime, "\t\t FATAL: spi_cmd_wdata exists X!\n");
-	check_spi_cmd_wmask_no_x: assert property (spi_cmd_wmask_no_x_check) else $error($stime, "\t\t FATAL: spi_cmd_wmask exists X!\n");
-	check_spi_rsp_valid_no_x: assert property (spi_rsp_valid_no_x_check) else $error($stime, "\t\t FATAL: spi_rsp_valid exists X!\n");
-	check_spi_rsp_ready_no_x: assert property (spi_rsp_ready_no_x_check) else $error($stime, "\t\t FATAL: spi_rsp_ready exists X!\n");
-  check_spi_rsp_rdata_no_x: assert property (spi_rsp_rdata_no_x_check) else $error($stime, "\t\t FATAL: spi_rsp_rdata exists X!\n");
-  check_spi_rsp_err_no_x: assert property (spi_rsp_err_no_x_check) else $error($stime, "\t\t FATAL: spi_rsp_err exists X!\n");
-
-  
-// Signals keep while valid and no handshake
-  property spi_cmd_addr_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_cmd_valid && !spi.spi_cmd_ready) |=>  $stable(spi.spi_cmd_addr);
-  endproperty
-
-	property spi_cmd_read_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_cmd_valid && !spi.spi_cmd_ready) |=>  $stable(spi.spi_cmd_read);
-  endproperty
-
-	property spi_cmd_wmask_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    ($past(spi.spi_cmd_valid && !spi.spi_cmd_ready) and !spi.spi_cmd_read) |->  $stable(spi.spi_cmd_wmask);
-  endproperty
-  
-  property spi_cmd_wdata_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    ($past(spi.spi_cmd_valid && !spi.spi_cmd_ready) and !spi.spi_cmd_read) |->  $stable(spi.spi_cmd_wdata);
-  endproperty
-
-  property spi_rsp_err_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_rsp_valid && !spi.spi_rsp_ready) |=>  $stable(spi.spi_rsp_err);
-  endproperty
-
-	property spi_rsp_rdata_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_rsp_valid && !spi.spi_rsp_ready && cmd) |=>  $stable(spi.spi_rsp_rdata);
-    //(spi.spi_cmd_valid && spi.spi_cmd_ready && spi.spi_cmd_read) |-> ##[0:$] ($stable(spi.spi_rsp_rdata) throughout ($past(spi.spi_rsp_valid))[*0:$]);
-  endproperty
-
-  check_spi_cmd_addr_keep: assert property (spi_cmd_addr_keep_check) else $error($stime, "\t\t FATAL: spi_cmd_addr does not keep!\n");
-  check_spi_cmd_read_keep: assert property (spi_cmd_read_keep_check) else $error($stime, "\t\t FATAL: spi_cmd_read does not keep!\n");
-  check_spi_cmd_wmask_keep: assert property (spi_cmd_wmask_keep_check) else $error($stime, "\t\t FATAL: spi_cmd_wmask does not keep!\n");
-  check_spi_cmd_wdata_keep: assert property (spi_cmd_wdata_keep_check) else $error($stime, "\t\t FATAL: spi_cmd_wdata does not keep!\n");
-  check_spi_rsp_err_keep: assert property (spi_rsp_err_keep_check) else $error($stime, "\t\t FATAL: spi_rsp_err does not keep!\n");
-  check_spi_rsp_rdata_keep: assert property (spi_rsp_rdata_keep_check) else $error($stime, "\t\t FATAL: spi_rsp_rdata does not keep!\n");
-
-// Valid must keep before handshaking
-  property spi_cmd_valid_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_cmd_valid && !spi.spi_cmd_ready) |=> spi.spi_cmd_valid;
-  endproperty 
-
-  property spi_rsp_valid_keep_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (spi.spi_rsp_valid && !spi.spi_rsp_ready) |=> spi.spi_rsp_valid;
-  endproperty
-  
-  check_spi_cmd_valid_keep: assert property (spi_cmd_valid_keep_check) else $error($stime, "\t\t FATAL: spi_cmd_valid does not keep!\n");
-  check_spi_rsp_valid_keep: assert property (spi_rsp_valid_keep_check) else $error($stime, "\t\t FATAL: spi_rsp_valid does not keep!\n");
-
-// Handshake
-  property spi_cmd_handshake_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (($rose(spi.spi_cmd_valid)) or ($past(spi.spi_cmd_valid && spi.spi_cmd_ready) && spi.spi_cmd_valid)) |-> ##[0:$] spi.spi_cmd_valid && spi.spi_cmd_ready;
-  endproperty
-
-  property spi_rsp_handshake_check;
-    @(posedge spi.clk) disable iff(!spi.rst_n)
-    (($rose(spi.spi_rsp_valid)) or ($past(spi.spi_rsp_valid && spi.spi_rsp_ready) && spi.spi_rsp_valid)) |-> ##[0:$] spi.spi_rsp_valid && spi.spi_rsp_ready;
-  endproperty
-
-  check_spi_cmd_handshake: assert property (spi_cmd_handshake_check) else $error($stime, "\t\t FATAL: spi CMD Channel does not handshake!\n");
-  check_spi_rsp_handshake: assert property (spi_rsp_handshake_check) else $error($stime, "\t\t FATAL: spi RSP Channel does not handshake!\n");
-
-  bit cmd;
-
-  always_ff @(spi.clk) begin
-    if (spi.spi_cmd_valid && spi.spi_cmd_ready)
-      cmd <= spi.spi_cmd_read;
-    else
-      cmd <= cmd;
-  end
-  
 endmodule

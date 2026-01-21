@@ -116,6 +116,7 @@ package env;
               for (int i = 0; i < 10; i = i + 1) begin
                 this.spi_agent.single_tran(1'b0, 16'hf0f0 + i, TXDATA_ADDR);
               end
+              this.spi_agent.single_tran(1'b1, 16'h0000, STAT_ADDR); // read status to end
               while (1) begin
                 this.spi_agent.single_tran(1'b1, 16'h0000, RXDATA_ADDR);
               end

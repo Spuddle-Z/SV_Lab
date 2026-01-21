@@ -5,7 +5,10 @@ module binding_module();
   );
 
   bind dut_top uart_assertion uart_assertion_bind_dut_top (
-    .uart(uart_bus.monitor)
+    .uart(uart_bus.monitor),
+    .tx_state(i_dut.uart_ctl_inst.tx_state),
+    .rx_state(i_dut.uart_ctl_inst.rx_state),
+    .baud_tick(i_dut.uart_ctl_inst.baud_tick)
   );
 
   bind dut_top fifo_assertion #(.fifo_type(0)) tx_fifo_assertion_bind_dut_top (
@@ -17,5 +20,9 @@ module binding_module();
     .full(i_dut.tx_fifo_inst.full),
 
     .wr_en(i_dut.tx_fifo_inst.wr_en),
-    .rd_en(i_dut.tx_fifo_inst.rd_en)
+    .rd_en(i_dut.tx_fifo_inst.rd_en),
+
+    .rd_ptr(i_dut.tx_fifo_inst.rd_ptr),
+    .wr_ptr(i_dut.tx_fifo_inst.wr_ptr)  
   );
+endmodule

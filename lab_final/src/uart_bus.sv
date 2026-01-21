@@ -16,24 +16,11 @@ interface uart_bus(input logic clk,input logic rst_n);
   logic tx;
   logic rx;
 
-  // Clocking blocks
-  // =======================================
-  clocking slv_cb @(posedge clk);
-    default input #0.25 output #0.25;
-    input tx;
-    output rx;
-  endclocking
-
-  clocking mnt_cb @(posedge clk);
-    default input #0.25 output #0.25;
-    input tx, rx;
-  endclocking
-
   // Mod ports
   // =======================================
   modport master(
-    output tx,
-    input rx, clk, rst_n
+    input rx, clk, rst_n,
+    output tx
   );
   modport slave(
     input clk, rst_n,
@@ -43,4 +30,18 @@ interface uart_bus(input logic clk,input logic rst_n);
     input clk, rst_n, tx, rx,
     clocking mnt_cb
   );
+
+  // Clocking blocks
+  // =======================================
+  clocking slv_cb @(posedge clk);
+    default input #1 output #1;
+    input tx;
+    output rx;
+  endclocking
+
+  clocking mnt_cb @(posedge clk);
+    default input #1 output #1;
+    input tx, rx;
+  endclocking
+
 endinterface:uart_bus //uart  

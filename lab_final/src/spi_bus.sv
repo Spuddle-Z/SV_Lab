@@ -22,19 +22,6 @@ interface spi_bus(input logic clk,input logic rst_n);
   logic mosi;
   logic miso;
 
-// Clocking blocks
-// =======================================
-  clocking mst_cb @(posedge clk);
-    default input #0.25 output #0.25;
-    output cs_n, sck, mosi;
-    input miso;
-  endclocking
-
-  clocking mnt_cb @(posedge clk);
-    default input #0.25 output #0.25;
-    input cs_n, sck, mosi, miso;
-  endclocking
-
 // Mod ports
 // =======================================
 
@@ -52,5 +39,18 @@ interface spi_bus(input logic clk,input logic rst_n);
     input clk, rst_n, sck, cs_n, mosi, miso,
     clocking mnt_cb
   );
+
+// Clocking blocks
+// =======================================
+  clocking mst_cb @(posedge clk);
+    default input #1 output #1;
+    output cs_n, sck, mosi;
+    input miso;
+  endclocking
+
+  clocking mnt_cb @(posedge clk);
+    default input #1 output #1;
+    input cs_n, sck, mosi, miso;
+  endclocking
 
 endinterface:spi_bus //spi
