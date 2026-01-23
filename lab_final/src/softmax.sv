@@ -99,55 +99,86 @@ module expu (
   end
 endmodule
 
-module softmax_out (
-    input  logic        clk,         // 时钟信号，上升沿有效
-    input  logic        rst_n,       // 复位信号，低电平有效
-    input  logic [7:0]  data_out[31:0], // 输入数据数组，32个8位数据
-    input  logic        valid_out,   // 输入数据有效指示，高电平时表示数据可用
-    output logic [15:0] tx_data,     // 输出16位数据，发送到下游
-    output logic        tx_empty,    // 输出缓冲区空指示，高电平时表示无数据可发送
-    input  logic        tx_fifo_en   // 下游FIFO使能信号，高电平时请求读取数据
+// 可综合 ln 估算模块：输入 uq16.8 的 F，输出 sq4.4 的 lnF 近似值
+// 步骤：
+// 1) LOD 找到整数部分最高位 1 的位置 F1（0 表示 bit15），若整数为 0 则输出 0
+// 2) 将 F 左移 F1 位得到 k，丢弃最高位，取其后 4bit 作为小数；w = 15 - F1 作为整数
+// 3) 将 {w, fraction} 视为 q4.4，按 0.1011(=11/16≈ln2) 缩放：A*0.6875 = (A>>1)+(A>>3)+(A>>4)
+module lnu (
+  input  logic [23:0] F,      // uq16.8
+  output logic signed [7:0] lnF // sq4.4
 );
+  logic [4:0]  F1;            // 0..16 (16 means no '1')
+  logic signed [4:0]  w;             // 15 - F1
+  logic [23:0] k;             // shifted F
+  logic [22:0] frac;
+  logic signed [27:0] A;             // sq5.23
+  logic signed [30:0] scaled;        // sq8.23
+  logic signed [30:0] scaled_shift;  // sq8.23 >> 19 -> sq4.4 对齐
 
-  // 内部数据缓冲区，存储16个16位数据
-  logic [15:0] data_buffer[15:0];
-  // 数据指针，指示下一个要发送的数据索引（0-15），当为5'd16时表示缓冲区为空
-  logic [4:0] ptr;
-
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      // 复位初始化
-      ptr <= 5'd16;               // 指针设为16，表示缓冲区空
-      tx_empty <= 1'b1;           // 空标志置高
-      tx_data <= 16'b0;           // 输出数据清零（可选）
-      // 可选：初始化缓冲区为0，但并非必需
-      for (int i = 0; i < 16; i++) begin
-        data_buffer[i] <= 16'b0;
-      end
-    end else begin
-      // 处理valid_out信号：当valid_out为高时，加载新数据到缓冲区
-      if (valid_out) begin
-        // 将32个8位数据两两组合成16个16位数据
-        // 假设data_out[0]为第一个字节（低8位），data_out[1]为第二个字节（高8位），依此类推
-        for (int i = 0; i < 16; i++) begin
-          data_buffer[i] <= {data_out[2*i+1], data_out[2*i]};
-        end
-        ptr <= 5'd0;            // 重置指针到缓冲区起始位置
-        tx_empty <= 1'b0;       // 缓冲区中有数据，空标志置低
-      end
-
-      if (tx_fifo_en && !tx_empty) begin
-        // 输出当前指针指向的数据
-        tx_data <= data_buffer[ptr];
-        // 指针递增，准备下一个数据
-        ptr <= ptr + 1;
-        // 检查是否所有数据都已发送
-        if (ptr == 5'd15) begin // 如果发送前指针为15，发送后缓冲区将为空
-          tx_empty <= 1'b1;   // 缓冲区空，设置空标志
-        end
+  // LOD: leading-zero count on F_int
+  always_comb begin
+    F1 = 5'd24; // default no bit set
+    for (int i = 0; i < 24; i++) begin
+      if (F[23 - i] && (F1 == 5'd24)) begin
+        F1 = i[4:0];
       end
     end
   end
+
+  always_comb begin
+    w    = 5'd15 - F1;
+    k    = F << F1;
+    frac = k[22:0];
+    A    = {w, frac};
+
+    // 乘以 0.1011 (11/16) ≈ ln2
+    scaled = (A >>> 1) + (A >>> 3) + (A >>> 4);
+    // 对齐到 sq4.4（移除 19 个小数位），再做符号饱和
+    scaled_shift = scaled >>> 19; // 保留符号
+
+    if (scaled_shift > 31'sd127) begin
+      lnF = 8'sh7F; // 正饱和
+    end else if (scaled_shift < -31'sd128) begin
+      lnF = 8'sh80; // 负饱和
+    end else begin
+      lnF = scaled_shift[7:0];
+    end
+  end
+endmodule
+
+// 加法树：8 个 uq12.8 输入，输出 uq16.8
+module add_tree (
+  input  logic [19:0] in0,
+  input  logic [19:0] in1,
+  input  logic [19:0] in2,
+  input  logic [19:0] in3,
+  input  logic [19:0] in4,
+  input  logic [19:0] in5,
+  input  logic [19:0] in6,
+  input  logic [19:0] in7,
+  output logic [23:0] sum    // uq16.8
+);
+  // 第一层
+  logic [20:0] s0; // 20+1
+  logic [20:0] s1;
+  logic [20:0] s2;
+  logic [20:0] s3;
+  // 第二层
+  logic [21:0] t0;
+  logic [21:0] t1;
+  // 第三层
+  logic [22:0] u0;
+
+  assign s0 = in0 + in1;
+  assign s1 = in2 + in3;
+  assign s2 = in4 + in5;
+  assign s3 = in6 + in7;
+
+  assign t0 = s0 + s1;
+  assign t1 = s2 + s3;
+
+  assign sum = t0 + t1;
 
 endmodule
 

@@ -345,6 +345,134 @@ module tb_expu;
 
 endmodule
 
+`timescale 1ns / 1ps
+
+//------------------------------------------------------------------------------
+// lnF_uq16p8 单元测试
+// 验证 ln(F) 近似输出与理想 ln(F) 的误差，并给出可计算/饱和范围
+//------------------------------------------------------------------------------
+module tb_lnu;
+
+  // 输入/输出信号
+  logic [23:0]       F;    // uq16.8 输入
+  logic signed [7:0] lnF;  // sq4.4 输出
+
+  // 待测模块实例化
+  lnu dut (
+    .F  (F),
+    .lnF(lnF)
+  );
+
+  // real 转 uq16.8（带饱和）
+  function automatic [23:0] to_q168(real r);
+    int tmp;
+    begin
+      tmp = $rtoi(r * 256.0 + 0.5);
+      if (tmp < 0) tmp = 0;
+      if (tmp > 24'hFFFFFF) tmp = 24'hFFFFFF;
+      to_q168 = tmp[23:0];
+    end
+  endfunction
+
+  // uq16.8 转 real
+  function automatic real q168_to_real(input [23:0] v);
+    q168_to_real = $itor(v) / 256.0;
+  endfunction
+
+  // real 转 sq4.4（带饱和）
+  function automatic signed [7:0] to_q44(real r);
+    int tmp;
+    begin
+      tmp = $rtoi(r * 16.0);
+      if (tmp > 127)  tmp = 127;
+      if (tmp < -128) tmp = -128;
+      to_q44 = tmp[7:0];
+    end
+  endfunction
+
+  // 统计与结果记录
+  int total_cnt;
+  int pass_cnt;
+  int max_abs_err;
+  int abs_err;
+  bit sat_pos_seen;
+  bit sat_neg_seen;
+  real sat_pos_at;
+  real sat_neg_at;
+  // 计算中间量（移出 initial，兼容纯 Verilog 声明规则）
+  real golden_r;
+  int  golden_q;
+  real offset;
+  real F_r;
+  real base;
+  int  frac_idx;
+
+  initial begin
+    total_cnt   = 0;
+    pass_cnt    = 0;
+    max_abs_err = 0;
+    sat_pos_seen= 0;
+    sat_neg_seen= 0;
+    sat_pos_at  = 0.0;
+    sat_neg_at  = 0.0;
+
+    // 扫描 F：基值按 2 的幂递增，叠加 0/0.2/0.4/0.6/0.8 的小偏置
+    for (base = 0.25; base <= 4096.0; base = base * 2.0) begin
+      for (frac_idx = 0; frac_idx < 5; frac_idx++) begin
+        offset = 0.2 * frac_idx;
+        F_r    = base + offset;
+
+        // 驱动输入
+        F = to_q168(F_r);
+        #1ns;
+
+        golden_r = $ln(q168_to_real(F));
+        golden_q = to_q44(golden_r);
+
+        abs_err = (lnF > golden_q) ? (lnF - golden_q) : (golden_q - lnF);
+        if (abs_err > max_abs_err) max_abs_err = abs_err;
+        total_cnt++;
+
+        // 允许 1 LSB 误差
+        if (abs_err <= 1) begin
+          pass_cnt++;
+          $display("[PASS] F=%0.3f q=%0d lnF_dut=%0d err=%0d", q168_to_real(F), golden_q, lnF, abs_err);
+        end else begin
+          $display("[FAIL] F=%0.3f q=%0d lnF_dut=%0d err=%0d", q168_to_real(F), golden_q, lnF, abs_err);
+        end
+
+        // 记录正/负饱和位置
+        if (!sat_pos_seen && lnF == 8'sh7F) begin
+          sat_pos_seen = 1'b1;
+          sat_pos_at   = q168_to_real(F);
+        end
+        if (!sat_neg_seen && lnF == 8'sh80) begin
+          sat_neg_seen = 1'b1;
+          sat_neg_at   = q168_to_real(F);
+        end
+      end
+    end
+
+    $display("\n================ lnu TB Summary ================" );
+    $display("Total cases : %0d", total_cnt);
+    $display("Pass  cases : %0d", pass_cnt);
+    $display("Max abs err : %0d LSB (sq4.4)", max_abs_err);
+    if (sat_pos_seen)
+      $display("Pos saturation at F >= %0.3f", sat_pos_at);
+    else
+      $display("Pos saturation not hit in sweep");
+    if (sat_neg_seen)
+      $display("Neg saturation at F <= %0.3f", sat_neg_at);
+    else
+      $display("Neg saturation not hit in sweep");
+    $display("=================================================\n");
+
+    #10ns;
+    $finish;
+  end
+
+endmodule
+
 
 
 
