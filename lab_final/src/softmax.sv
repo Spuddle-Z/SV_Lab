@@ -147,7 +147,7 @@ module lnu (
   end
 endmodule
 
-// 加法树：8 个 uq12.8 输入，输出 uq16.8
+// 加法树：16 个 uq12.8 输入，输出 uq16.8
 module add_tree (
   input  logic [19:0] in0,
   input  logic [19:0] in1,
@@ -157,28 +157,41 @@ module add_tree (
   input  logic [19:0] in5,
   input  logic [19:0] in6,
   input  logic [19:0] in7,
+  input  logic [19:0] in8,
+  input  logic [19:0] in9,
+  input  logic [19:0] in10,
+  input  logic [19:0] in11,
+  input  logic [19:0] in12,
+  input  logic [19:0] in13,
+  input  logic [19:0] in14,
+  input  logic [19:0] in15,
   output logic [23:0] sum    // uq16.8
 );
-  // 第一层
-  logic [20:0] s0; // 20+1
-  logic [20:0] s1;
-  logic [20:0] s2;
-  logic [20:0] s3;
-  // 第二层
-  logic [21:0] t0;
-  logic [21:0] t1;
-  // 第三层
-  logic [22:0] u0;
+  // 第一层（16->8），每对相加，位宽 21
+  logic [20:0] s0, s1, s2, s3, s4, s5, s6, s7;
+  // 第二层（8->4），位宽 22
+  logic [21:0] t0, t1, t2, t3;
+  // 第三层（4->2），位宽 23
+  logic [22:0] u0, u1;
 
-  assign s0 = in0 + in1;
-  assign s1 = in2 + in3;
-  assign s2 = in4 + in5;
-  assign s3 = in6 + in7;
+  assign s0 = in0  + in1;
+  assign s1 = in2  + in3;
+  assign s2 = in4  + in5;
+  assign s3 = in6  + in7;
+  assign s4 = in8  + in9;
+  assign s5 = in10 + in11;
+  assign s6 = in12 + in13;
+  assign s7 = in14 + in15;
 
   assign t0 = s0 + s1;
   assign t1 = s2 + s3;
+  assign t2 = s4 + s5;
+  assign t3 = s6 + s7;
 
-  assign sum = t0 + t1;
+  assign u0 = t0 + t1;
+  assign u1 = t2 + t3;
+
+  assign sum = u0 + u1;
 
 endmodule
 
