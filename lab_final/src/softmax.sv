@@ -30,7 +30,7 @@ module expu (
   // 线性拟合 2^v_i，使用 2^x ≈ 1 + x * ln2，ln2≈0.693 -> 0.693*(2^8)/16 ≈ 11
   localparam logic [7:0] LN2_SLOPE = 8'd11; // 斜率在 q0.8 视角下的缩放系数
   logic [25:0] mantissa;     // q0.8 格式的尾数（含 8bit 小数）
-  assign mantissa = 26'd256 + (v_i * LN2_SLOPE); // 1.0 对应 256
+  assign mantissa = 26'd246 + (v_i * LN2_SLOPE); // 1.0 对应 256
 
   // 通过位移乘以 2^u_i，保持 8bit 小数位
   logic [25:0] scaled;
