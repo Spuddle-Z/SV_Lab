@@ -340,7 +340,7 @@ module tb_expu;
     $display("=================================================\n");
 
     #10ns;
-    $finish;
+    $stop;
   end
 
 endmodule
@@ -468,11 +468,199 @@ module tb_lnu;
     $display("=================================================\n");
 
     #10ns;
-    $finish;
+    $stop;
   end
 
 endmodule
 
+
+`timescale 1ns/1ps
+
+//------------------------------------------------------------------------------
+// softmax 模块自检：检查数值误差、busy/done/handshake
+//------------------------------------------------------------------------------
+module tb_softmax_unit;
+  localparam real TCLK = 10.0;
+
+  // DUT 接口
+  logic        clk;
+  logic        rst_n;
+  logic        start;
+  logic [127:0] data_in;
+  logic [127:0] data_out;
+  logic        busy;
+  logic        done;
+
+  // 时钟
+  initial begin
+    clk = 0;
+    forever #(TCLK/2) clk = ~clk;
+  end
+
+  // 复位
+  initial begin
+    rst_n = 0;
+    start = 0;
+    data_in = '0;
+    #(5*TCLK);
+    rst_n = 1;
+  end
+
+  // 函数：real -> q3.4 有符号
+  function automatic signed [7:0] to_q34(real r);
+    int tmp;
+    begin
+      tmp = $rtoi(r * 16.0);
+      if (tmp > 127)  tmp = 127;
+      if (tmp < -128) tmp = -128;
+      to_q34 = tmp[7:0];
+    end
+  endfunction
+
+  // 函数：q3.4 -> real
+  function automatic real q34_to_real(input signed [7:0] v);
+    q34_to_real = $itor(v) / 16.0;
+  endfunction
+
+  // 函数：real 概率 -> uq0.8 (8bit)
+  function automatic [7:0] prob_to_q08(real p);
+    int tmp;
+    begin
+      tmp = $rtoi(p * 256.0 + 0.5);
+      if (tmp < 0) tmp = 0;
+      if (tmp > 255) tmp = 255;
+      prob_to_q08 = tmp[7:0];
+    end
+  endfunction
+
+  // 打包 16 x 8bit 到 128bit
+  function automatic [127:0] pack_vec(input signed [7:0] v[15:0]);
+    for (int i = 0; i < 16; i++) begin
+      pack_vec[8*i +: 8] = v[i];
+    end
+  endfunction
+
+  // 求 softmax 理想值 (double precision)
+  task automatic golden_softmax(
+    input  signed [7:0] v_in[15:0],
+    output [7:0]        v_out[15:0]
+  );
+    real exp_sum;
+    real e[15:0];
+    begin
+      exp_sum = 0.0;
+      for (int i = 0; i < 16; i++) begin
+        e[i] = $exp(q34_to_real(v_in[i]));
+        exp_sum += e[i];
+      end
+      for (int i = 0; i < 16; i++) begin
+        v_out[i] = prob_to_q08(e[i] / exp_sum);
+      end
+    end
+  endtask
+
+  // DUT 实例
+  softmax u_dut (
+    .clk     (clk),
+    .rst_n   (rst_n),
+    .start   (start),
+    .data_in (data_in),
+    .data_out(data_out),
+    .busy    (busy),
+    .done    (done)
+  );
+
+  // 计数与检查
+  int total_cases;
+  int pass_cases;
+  int max_err;
+  int err;
+  int busy_len;
+
+  task automatic run_case(input signed [7:0] vec[15:0]);
+    // 本地数组声明移至任务体起始，兼容纯 Verilog 声明规则
+    reg [7:0] golden[15:0];
+    integer local_err;
+    begin
+      golden_softmax(vec, golden);
+      data_in = pack_vec(vec);
+
+      // 发起 start 脉冲
+      @(posedge clk);
+      start <= 1'b1;
+      @(posedge clk);
+      start <= 1'b0;
+
+      // 记录 busy 长度
+      busy_len = 0;
+      wait(busy == 1'b1);
+      while (busy) begin
+        busy_len++;
+        @(posedge clk);
+      end
+
+      // done 应在 busy 拉低前一拍拉高
+      if (!done) begin
+        $display("[WARN] done not observed for vector");
+      end
+
+      // 比对输出
+      local_err = 0;
+      for (int i = 0; i < 16; i++) begin
+        err = (data_out[8*i +: 8] > golden[i]) ? (data_out[8*i +: 8] - golden[i]) : (golden[i] - data_out[8*i +: 8]);
+        if (err > local_err) local_err = err;
+        if (err > 32) begin
+          $display("[FAIL] idx=%0d input=%0d dut=%0d golden=%0d err=%0d", i, vec[i], data_out[8*i +: 8], golden[i], err);
+        end else begin
+          $display("[PASS] idx=%0d input=%0d dut=%0d golden=%0d err=%0d", i, vec[i], data_out[8*i +: 8], golden[i], err);
+        end
+      end
+
+      if (local_err <= 32) begin
+        pass_cases++;
+      end
+      if (local_err > max_err) max_err = local_err;
+      total_cases++;
+
+      // 打印一次示例
+      $display("[CASE] busy_len=%0d max_err_case=%0d", busy_len, local_err);
+      $display("-------------------------------------------------");
+    end
+  endtask
+
+  // 测试主流程
+  initial begin
+    logic signed [7:0] vec[15:0];
+
+    total_cases = 0;
+    pass_cases  = 0;
+    max_err     = 0;
+
+    // 等复位
+    @(posedge rst_n);
+    @(posedge clk);
+
+    // 随机用例：在 sq4.4 允许范围内（-8.0 ~ 7.9375）随机取值
+    for (int case_idx = 0; case_idx < 50; case_idx++) begin
+      for (int i = 0; i < 16; i++) begin
+        int rnd_q34;
+        rnd_q34 = $urandom_range(-128, 127); // 覆盖 sq4.4 全范围
+        vec[i]  = rnd_q34[7:0];
+      end
+      run_case(vec);
+    end
+
+    $display("\n========== softmax TB Summary ==========");
+    $display("Total cases : %0d", total_cases);
+    $display("Pass  cases : %0d", pass_cases);
+    $display("Max abs err : %0d LSB (uq0.8)", max_err);
+    $display("========================================\n");
+
+    #(5*TCLK);
+    $stop;
+  end
+
+endmodule
 
 
 
