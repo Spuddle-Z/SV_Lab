@@ -662,6 +662,210 @@ module tb_softmax_unit;
 
 endmodule
 
+`timescale 1ns/1ps
+
+//------------------------------------------------------------------------------
+// softmax_top 综合级联自检：包含打包与 softmax 运算
+//------------------------------------------------------------------------------
+module tb_softmax_top;
+  localparam real TCLK = 10.0;
+
+  // DUT 接口
+  logic        clk;
+  logic        rst_n;
+  logic        softmax_en;
+  logic        empty;
+  logic [15:0] data_in;
+  logic        rd_en;
+  logic        done; // 未使用，置 0
+  logic        valid;
+  logic [127:0] data_out;
+
+  // 时钟
+  initial begin
+    clk = 0;
+    forever #(TCLK/2) clk = ~clk;
+  end
+
+  // 复位
+  initial begin
+    rst_n = 0;
+    softmax_en = 0;
+    empty = 1;
+    data_in = 16'h0;
+    done = 1'b0;
+    #(5*TCLK);
+    rst_n = 1;
+  end
+
+  // DUT
+  softmax_top u_dut (
+    .clk       (clk),
+    .rst_n     (rst_n),
+    .softmax_en(softmax_en),
+    .empty     (empty),
+    .data_in   (data_in),
+    .rd_en     (rd_en),
+    .done      (done),
+    .valid     (valid),
+    .data_out  (data_out)
+  );
+
+  // 工具函数
+  function automatic [127:0] pack_words(input [15:0] words[7:0]);
+    integer i;
+    begin
+      pack_words = '0;
+      for (i = 0; i < 8; i = i + 1) begin
+        pack_words = {words[i], pack_words[127:16]};
+      end
+    end
+  endfunction
+
+  function automatic real byte_to_real(input signed [7:0] b);
+    byte_to_real = $itor(b)/16;
+  endfunction
+
+  function automatic [7:0] prob_to_q08(real p);
+    int tmp;
+    begin
+      tmp = $rtoi(p * 256.0 + 0.5);
+      if (tmp < 0) tmp = 0;
+      if (tmp > 255) tmp = 255;
+      prob_to_q08 = tmp[7:0];
+    end
+  endfunction
+
+  task automatic golden_softmax(
+    input  signed [7:0] vin[15:0],
+    output [7:0]        gout[15:0]
+  );
+    real e[15:0];
+    real esum;
+    integer i;
+    esum = 0.0;
+    for (i = 0; i < 16; i = i + 1) begin
+      e[i] = $exp(byte_to_real(vin[i]));
+      esum += e[i];
+    end
+    for (i = 0; i < 16; i = i + 1) begin
+      gout[i] = prob_to_q08(e[i]/esum);
+    end
+  endtask
+
+  // 数据驱动：当 rd_en 拉高时喂一个 word
+  task automatic feed_vector(input signed [7:0] bytes[15:0]);
+    reg [15:0] words[7:0];
+    int idx;
+    integer i;
+    begin
+      for (i = 0; i < 8; i = i + 1) begin
+        words[i] = {bytes[2*i+1][7:0], bytes[2*i][7:0]};
+      end
+      idx = 0;
+      data_in = words[0];
+      idx = 1;
+      empty = 0;
+      @(posedge rd_en);
+      while (idx < 8) begin
+        data_in = words[idx];
+        idx++;
+        @(posedge rd_en);
+      end
+      @(posedge clk);
+      empty = 1'b1; // 数据喂完
+    end
+  endtask
+
+  // 检查 bypass 模式 (softmax_en=0)
+  task automatic test_bypass();
+    reg signed [7:0] bytes[15:0];
+    reg [15:0] words[7:0];
+    reg [127:0] expect_pack;
+    integer i;
+    begin
+      for (i = 0; i < 16; i = i + 1) bytes[i] = $urandom_range(-8, 7);
+      for (i = 0; i < 8; i = i + 1) words[i] = {bytes[2*i+1][7:0], bytes[2*i][7:0]};
+      expect_pack = pack_words(words);
+
+      softmax_en = 0;
+      done       = 0;
+      feed_vector(bytes);
+      wait(valid);
+      @(posedge clk);
+      if (data_out !== expect_pack) begin
+        $display("[BYPASS][FAIL] expect=0x%0h got=0x%0h", expect_pack, data_out);
+      end else begin
+        $display("[BYPASS][PASS]");
+      end
+
+      // 下游确认
+      done = 1'b1;
+      @(posedge clk);
+      done = 1'b0;
+      wait(!valid);
+    end
+  endtask
+
+  // 检查 softmax 模式 (softmax_en=1)
+  task automatic test_softmax();
+    reg signed [7:0] bytes[15:0];
+    reg [7:0] golden[15:0];
+    int max_err;
+    int dout;
+    int err;
+    int i;
+    begin
+      max_err = 0;
+      dout    = 0;
+      err     = 0;
+
+      for (i = 0; i < 16; i = i + 1) bytes[i] = $urandom_range(-6, 7);
+      golden_softmax(bytes, golden);
+
+      softmax_en = 1;
+      done       = 0;
+      feed_vector(bytes);
+      wait(valid);
+      @(posedge clk);
+
+      for (i = 0; i < 16; i = i + 1) begin
+        dout = data_out[8*i +: 8];
+        err  = (dout > golden[i]) ? (dout - golden[i]) : (golden[i] - dout);
+        if (err > max_err) max_err = err;
+        if (err > 4) begin
+          $display("[SOFTMAX][FAIL] idx=%0d in=%0d dut=%0d golden=%0d err=%0d", i, bytes[i], dout, golden[i], err);
+        end else begin
+          $display("[SOFTMAX][PASS] idx=%0d in=%0d dut=%0d golden=%0d err=%0d", i, bytes[i], dout, golden[i], err);
+        end
+      end
+      $display("[SOFTMAX] max_err=%0d", max_err);
+
+      // 下游确认
+      done = 1'b1;
+      @(posedge clk);
+      done = 1'b0;
+      wait(!valid);
+    end
+  endtask
+
+  // 主控
+  initial begin
+    @(posedge rst_n);
+    @(posedge clk);
+
+    test_bypass();
+
+    repeat (5) begin
+      test_softmax();
+    end
+
+    #(10*TCLK);
+    $stop;
+  end
+
+endmodule
+
 
 
 

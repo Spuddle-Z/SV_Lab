@@ -149,7 +149,6 @@ module softmax (
   input  logic        start,
   input  logic [127:0] data_in,
   output logic [127:0] data_out,
-  output logic        busy,
   output logic        done
 );
   // 状态机
@@ -234,8 +233,6 @@ module softmax (
     endcase
   end
 
-  assign busy = (state != S_IDLE);
-
   // 输出打包：先组合，再在 S_PHASE1 锁存，避免 S_IDLE/PHASE0 的中间值外泄
   logic [127:0] data_out_next;
   generate
@@ -255,7 +252,6 @@ module softmax (
 
 endmodule
 
-// softmax_top：当 softmax_en=0 时，行为等同 data_packer；softmax_en=1 时执行 16 点 softmax
 module softmax_top (
   input  logic        clk,
   input  logic        rst_n,
@@ -272,66 +268,130 @@ module softmax_top (
   output logic [127:0] data_out
 );
   localparam int PACKET_NUM = 8;
-  logic [$clog2(PACKET_NUM + 1)-1:0] pack_count;
-  logic [127:0] pack_buffer;
-  logic pack_valid;
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      pack_count  <= '0;
-      rd_en      <= 1'b0;
-      pack_valid  <= 1'b0;
-      pack_buffer <= '0;
-    end else begin
-      pack_valid <= 1'b0;
+  typedef enum logic [2:0] {
+    ST_FILL,       // 等待并收集 8 个 16b 包
+    ST_START_SF,   // 发出 softmax start 脉冲
+    ST_WAIT_SF,    // 等待 softmax done
+    ST_OUTPUT      // 有效数据待下游读取
+  } sf_top_state_t;
 
-      if (pack_count < PACKET_NUM) begin
-        if (!empty && !rd_en) begin
-          rd_en      <= 1'b1;
-          pack_buffer <= {data_in, pack_buffer[127:16]};
-          pack_count  <= pack_count + 1'b1;
-        end else begin
-          rd_en <= 1'b0;
-        end
-      end else begin
-        pack_valid <= 1'b1;
-        pack_count <= '0;
-        rd_en     <= 1'b0;
-      end
-    end
-  end
+  sf_top_state_t state, state_n;
 
-  wire [127:0] pack_data = pack_buffer;
+  logic [$clog2(PACKET_NUM + 1)-1:0] pack_count, pack_count_n;
+  logic [127:0] pack_buffer, pack_buffer_n;
+  logic [127:0] data_out_n;
+  logic rd_en_n;
+  logic rd_cooldown, rd_cooldown_n; // 保证 rd_en 断续（高 1 周期、低 1 周期）
+  logic valid_n;
+  logic sf_start, sf_start_n;
 
-  // softmax 运算模块实例
-  logic        sf_busy;
-  logic        sf_start;
+  // softmax 实例
   logic        sf_done;
   logic [127:0] sf_data_out;
-
-  assign sf_start = softmax_en && pack_valid && !sf_busy;
 
   softmax u_softmax (
     .clk      (clk),
     .rst_n    (rst_n),
     .start    (sf_start),
-    .data_in  (pack_data),
+    .data_in  (pack_buffer),
     .data_out (sf_data_out),
-    .busy     (sf_busy),
     .done     (sf_done)
   );
 
-  // valid 与数据选择
-  always_comb begin
-    data_out = 128'h0;
-    valid    = 1'b0;
-    if (!softmax_en) begin
-      data_out = pack_data;
-      valid    = pack_valid;
+  // 状态与寄存器
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      state       <= ST_FILL;
+      pack_count  <= '0;
+      pack_buffer <= '0;
+      data_out    <= '0;
+      rd_en       <= 1'b0;
+      rd_cooldown <= 1'b0;
+      valid       <= 1'b0;
+      sf_start    <= 1'b0;
     end else begin
-      data_out = sf_data_out;
-      valid    = sf_done;
+      state       <= state_n;
+      pack_count  <= pack_count_n;
+      pack_buffer <= pack_buffer_n;
+      data_out    <= data_out_n;
+      rd_en       <= rd_en_n;
+      rd_cooldown <= rd_cooldown_n;
+      valid       <= valid_n;
+      sf_start    <= sf_start_n;
     end
+  end
+
+  // 组合逻辑
+  always_comb begin
+    // 默认保持
+    state_n       = state;
+    pack_count_n  = pack_count;
+    pack_buffer_n = pack_buffer;
+    data_out_n    = data_out;
+    rd_en_n       = 1'b0;
+    rd_cooldown_n = rd_cooldown;
+    valid_n       = valid;
+    sf_start_n    = 1'b0;
+
+    case (state)
+      ST_FILL: begin
+        valid_n = 1'b0;
+        // rd_en 脉冲后插入一个低周期，避免连续高
+        if (rd_cooldown)
+          rd_cooldown_n = 1'b0;
+
+        // 收集 8 个 16b 单元
+        if (pack_count < PACKET_NUM) begin
+          if (!empty && !rd_cooldown) begin
+            rd_en_n       = 1'b1;
+            pack_buffer_n = {data_in, pack_buffer[127:16]};
+            pack_count_n  = pack_count + 1'b1;
+            rd_cooldown_n = 1'b1; // 下一拍强制拉低
+          end
+        end else begin
+          // 收齐 8 个字后，根据 softmax_en 决定路径
+          if (softmax_en) begin
+            state_n = ST_START_SF;
+          end else begin
+            data_out_n = pack_buffer;
+            valid_n    = 1'b1;
+            state_n    = ST_OUTPUT;
+          end
+        end
+      end
+
+      ST_START_SF: begin
+        // 给 softmax 一个周期的 start 脉冲
+        sf_start_n = 1'b1;
+        state_n    = ST_WAIT_SF;
+      end
+
+      ST_WAIT_SF: begin
+        // 等待 softmax 完成，将结果写入 buffer
+        if (sf_done) begin
+          pack_buffer_n = sf_data_out;
+          data_out_n    = sf_data_out;
+          valid_n       = 1'b1;
+          state_n       = ST_OUTPUT;
+        end
+      end
+
+      ST_OUTPUT: begin
+        // 有效数据保持，等待下游 done
+        rd_en_n = 1'b0;
+        if (done) begin
+          valid_n       = 1'b0;
+          pack_count_n  = '0;
+          pack_buffer_n = '0;
+          state_n       = ST_FILL;
+        end
+      end
+
+      default: begin
+        state_n = ST_FILL;
+      end
+    endcase
   end
 
 endmodule
