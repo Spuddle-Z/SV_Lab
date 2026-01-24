@@ -234,10 +234,10 @@ module uart_ctl (
   input logic rx,
   output logic tx,
   
-  // TX接口（连接到外部TX FIFO）
-  input logic [15:0] tx_data,
-  input logic tx_empty,
-  output logic tx_fifo_en,
+  // TX接口
+  input logic [127:0] tx_data,
+  input logic data_valid,
+  output logic tx_done,
   
   // RX接口（连接到外部RX FIFO）
   output logic [15:0] rx_data,
@@ -284,51 +284,50 @@ module uart_ctl (
   // 内部寄存器
   tx_state_t tx_state;
   rx_state_t rx_state;
-  logic [15:0] tx_data_reg;
-  logic tx_byte_count;
+  logic [127:0] tx_data_reg;
+  logic [4:0]   tx_byte_idx; // 0..15
   logic [15:0] rx_data_reg;
   logic rx_byte_count;
 
-  // 发送控制逻辑
+  // 发送控制逻辑：data_valid 触发发送 16 个字节，逐字节握手 uart_tx
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      tx_state <= TX_IDLE;
-      tx_fifo_en <= 1'b0;
-      tx_valid <= 1'b0;
-      tx_data_reg <= 16'b0;
-      tx_byte_count <= 1'b0;
+      tx_state    <= TX_IDLE;
+      tx_valid    <= 1'b0;
+      tx_data_reg <= '0;
+      tx_byte_idx <= '0;
+      tx_byte     <= 8'h00;
+      tx_done     <= 1'b0;
     end else begin
-      tx_fifo_en <= 1'b0;
-      tx_valid <= 1'b0;
+      tx_valid <= 1'b0; // 默认不拉高
+      tx_done  <= 1'b0;
 
       case (tx_state)
         TX_IDLE: begin
-          if (!tx_empty) begin
-            tx_fifo_en <= 1'b1;
+          if (data_valid) begin
             tx_data_reg <= tx_data;
-            tx_byte_count <= 1'b0;
-            tx_state <= TX_SEND;
+            tx_byte_idx <= 5'd0;
+            tx_state    <= TX_SEND;
           end
         end
 
         TX_SEND: begin
           if (!tx_busy) begin
-            case (tx_byte_count)
-              1'b0: tx_byte <= tx_data_reg[7:0];
-              1'b1: tx_byte <= tx_data_reg[15:8];
-            endcase
-            tx_valid <= 1'b1;
-
-            if (tx_byte_count == 1'b1) begin
-              tx_state <= TX_END;
+            tx_byte  <= tx_data_reg[8*tx_byte_idx +: 8];
+            tx_valid <= 1'b1; // 一个周期脉冲
+            if (tx_byte_idx == 5'd15) begin
+              tx_state <= TX_END; // 发送最后一个字节后等待 busy 结束
             end else begin
-              tx_byte_count <= tx_byte_count + 1;
+              tx_byte_idx <= tx_byte_idx + 1'b1;
+              tx_state    <= TX_SEND; // 下一字节会在 busy 拉低后再次进入此分支
             end
           end
         end
 
         TX_END: begin
-          if (!tx_busy) begin  // 等待最后一个字节发送完成
+          // 等待最后一个字节的 busy 拉低，再宣告完成
+          if (!tx_busy) begin
+            tx_done  <= 1'b1; // 完成脉冲
             tx_state <= TX_IDLE;
           end
         end

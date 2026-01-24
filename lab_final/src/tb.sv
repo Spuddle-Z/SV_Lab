@@ -1,99 +1,126 @@
 `timescale 1ns/1ps
 
-module tb_data_packer;
+//------------------------------------------------------------------------------
+// uart_ctl 简单自检：发送 128bit（16 字节）数据并校验 tx_valid 序列与 tx_done
+//------------------------------------------------------------------------------
+module tb_uart_ctl;
+  localparam real TCLK = 10.0;
 
-  // 1. 信号声明
-  logic           clk;
-  logic           rst_n;
-  
-  // 上游信号
-  logic           empty;
-  logic [15:0]    data_in;
-  
-  // 下游信号
-  logic           enable;
-  logic           valid;
-  logic [127:0]   data_out;
+  logic        clk;
+  logic        rst_n;
+  logic [15:0] baud_divisor;
 
-  // 2. 模块例化
-  data_packer u_dut (
-    .clk(clk),
-    .rst_n(rst_n),
-    .empty(empty),
-    .data_in(data_in),
-    .enable(enable),
-    .valid(valid),
-    .data_out(data_out)
+  // UART 物理线
+  logic rx;
+  logic tx;
+
+  // Controller 接口
+  logic [3:0]  state;
+  logic [127:0] tx_data;
+  logic        data_valid;
+  logic        tx_done;
+  logic [15:0] rx_data;
+  logic        rx_full;
+  logic        rx_fifo_en;
+
+  // DUT
+  uart_ctl u_dut (
+    .clk          (clk),
+    .rst_n        (rst_n),
+    .baud_divisor (baud_divisor),
+    .state        (state),
+    .rx           (rx),
+    .tx           (tx),
+    .tx_data      (tx_data),
+    .data_valid   (data_valid),
+    .tx_done      (tx_done),
+    .rx_data      (rx_data),
+    .rx_full      (rx_full),
+    .rx_fifo_en   (rx_fifo_en)
   );
 
-  // 3. 时钟生成
+  // 时钟
   initial begin
     clk = 0;
-    forever #5 clk = ~clk;
+    forever #(TCLK/2) clk = ~clk;
   end
 
-  // 4. 激励与监测主逻辑
-  initial begin
-    // ---------------------------------------------------------
-    // 【关键修改】：把所有需要用到的变量声明都放在这里！
-    // ---------------------------------------------------------
-    logic [127:0] expected_data;
-    logic [127:0] received_data;
-    
-    // 初始化
-    rst_n = 0;
-    empty = 1; 
-    data_in = 0;
-    
-    // 复位
-    repeat(10) @(posedge clk);
-    rst_n = 1;
-    repeat(2) @(posedge clk);
-    
-    $display("-------------- Test Start --------------");
-    $display("Time: %0tns, Reset released", $time);
+  // 监视捕获 tx_valid 上送出的字节序列
+  byte captured [0:15];
+  int cap_idx;
 
-    // === 场景 1: 连续发送 8 个数据 ===
-    empty = 0; 
-    
-    for (int i = 0; i < 8; i++) begin
-      data_in = i;  
-      @(negedge clk);
-      @(negedge clk);
-      
-      $display("Time: %0tns, Driving data_in=%0d, Enable observed: %0b", 
-           $time, i, enable);
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      cap_idx <= 0;
+    end else if (u_dut.tx_valid) begin
+      if (cap_idx < 16) begin
+        captured[cap_idx] <= u_dut.tx_byte;
+        cap_idx <= cap_idx + 1;
+      end
+    end
+  end
+
+  // 主流程
+  initial begin
+    int wait_cycles;
+    int err_cnt;
+    byte exp;
+
+    rx_full = 1'b0;
+    rx      = 1'b1; // 空闲高
+    baud_divisor = 16'd4; // 加快仿真
+    tx_data = 128'h0;
+    data_valid = 1'b0;
+    rst_n = 1'b0;
+    #(5*TCLK);
+    rst_n = 1'b1;
+    @(posedge clk);
+
+    // 准备 16 字节（低字节在前）
+    tx_data = {8'h0F,8'h0E,8'h0D,8'h0C,8'h0B,8'h0A,8'h09,8'h08,
+               8'h07,8'h06,8'h05,8'h04,8'h03,8'h02,8'h01,8'h00};
+
+    // 拉高 data_valid 一个周期
+    @(posedge clk);
+    data_valid = 1'b1;
+    @(posedge clk);
+    data_valid = 1'b0;
+
+    // 等待 tx_done，设置超时保护
+    wait_cycles = 0;
+    while (!tx_done && wait_cycles < 500000) begin
+      @(posedge clk);
+      wait_cycles++;
     end
 
-    // === 等待 DUT 输出 ===
-    wait(valid == 1);
-    @(posedge clk); 
-    received_data = data_out;
+    if (!tx_done) begin
+      $display("[UART_CTL][FAIL] tx_done timeout");
+      $stop;
+    end
 
-    // === 构造期望值 ===
-    // RTL逻辑是高位移位：输入 0..7，输出应为 {7,6,5,4,3,2,1,0}
-    expected_data = {16'd7, 16'd6, 16'd5, 16'd4, 16'd3, 16'd2, 16'd1, 16'd0};
+    // 等一拍收尾
+    @(posedge clk);
 
-    $display("-------------- Checking Result --------------");
-    $display("Time: %0tns, Valid Asserted!", $time);
-    $display("Expected Output: 0x%0h", expected_data);
-    $display("Actual   Output: 0x%0h", received_data);
-
-    if (received_data === expected_data) begin
-      $display("\n*** TEST PASSED! ***\n");
+    // 校验捕获的 tx_valid 序列
+    if (cap_idx != 16) begin
+      $display("[UART_CTL][FAIL] tx_valid count=%0d expected=16", cap_idx);
     end else begin
-      $display("\n*** TEST FAILED! ***\n");
+      err_cnt = 0;
+      for (int i = 0; i < 16; i++) begin
+        exp = tx_data[8*i +: 8];
+        if (captured[i] !== exp) begin
+          $display("[UART_CTL][MISMATCH] idx=%0d exp=%0h got=%0h", i, exp, captured[i]);
+          err_cnt++;
+        end
+      end
+      if (err_cnt == 0)
+        $display("[UART_CTL][PASS] all 16 bytes sent correctly, tx_done observed after %0d cycles", wait_cycles);
+      else
+        $display("[UART_CTL][FAIL] %0d mismatches", err_cnt);
     end
 
-    // 结束仿真
-    repeat(10) @(posedge clk);
-    $finish;
-  end
-
-  // 波形 Dump
-  initial begin
-    $dumpfile("wave.vcd");
-    $dumpvars(0, tb_data_packer);
+    #(10*TCLK);
+    $stop;
   end
 
 endmodule
