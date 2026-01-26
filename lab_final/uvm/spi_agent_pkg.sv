@@ -6,7 +6,6 @@ package spi_agent_pkg;
 
   // =========================================================
   // SPI Sequencer类定义
-  // =========================================================
   class spi_sequencer extends uvm_sequencer #(spi_trans);
     `uvm_component_utils(spi_sequencer)
 
@@ -18,7 +17,6 @@ package spi_agent_pkg;
 
   // =========================================================
   // SPI Driver类定义
-  // =========================================================
   class spi_driver extends uvm_driver #(spi_trans);
     `uvm_component_utils(spi_driver)
 
@@ -40,8 +38,8 @@ package spi_agent_pkg;
     // 实现驱动任务
     virtual task run_phase(uvm_phase phase);
       spi_trans tx;
-      logic [31:0] tx_data;
-      logic [31:0] rx_data;
+      logic [31:0] mosi;
+      logic [31:0] miso;
       int bit_count;
 
       // 接口初始化
@@ -54,22 +52,22 @@ package spi_agent_pkg;
 
         // 驱动事务到接口
         if (tx.read) begin
-          tx_data = {8'h01, tx.addr[7:0], 16'h0000};
+          mosi = {8'h01, tx.addr[7:0], 16'h0000};
         end else begin
-          tx_data = {8'h00, tx.addr[7:0], tx.wdata};
+          mosi = {8'h00, tx.addr[7:0], tx.wdata};
         end
-        rx_data = 32'h0;
+        miso = 32'h0;
 
         // 开始事务
         active_if.mst_cb.cs_n <= 1'b0;
 
         @(active_if.mst_cb);
         for (bit_count = 0; bit_count < 32; bit_count = bit_count + 1) begin
-          active_if.mst_cb.mosi <= tx_data[bit_count];
+          active_if.mst_cb.mosi <= mosi[bit_count];
 
           @(active_if.mst_cb);
           active_if.mst_cb.sck <= 1'b1;
-          rx_data[bit_count] = active_if.mst_cb.miso;
+          miso[bit_count] = active_if.mst_cb.miso;
 
           @(active_if.mst_cb);
           active_if.mst_cb.sck <= 1'b0;
@@ -83,7 +81,7 @@ package spi_agent_pkg;
         @(active_if.mst_cb);
 
         if (tx.read) begin
-          tx.rdata = rx_data;
+          tx.rdata = miso;
         end
 
         seq_item_port.item_done();
@@ -93,7 +91,6 @@ package spi_agent_pkg;
 
   // =========================================================
   // SPI Monitor类定义
-  // =========================================================
   class spi_monitor extends uvm_monitor;
     `uvm_component_utils(spi_monitor)
 
@@ -119,8 +116,8 @@ package spi_agent_pkg;
     // 实现监视任务
     virtual task run_phase(uvm_phase phase);
       spi_trans monitor_trans;
-      logic [31:0] tx_data;
-      logic [31:0] rx_data;
+      logic [31:0] mosi;
+      logic [31:0] miso;
       int bit_count;
 
       forever begin
@@ -132,8 +129,8 @@ package spi_agent_pkg;
         // 采样32位数据
         for (bit_count = 0; bit_count < 32; bit_count = bit_count + 1) begin
           @(posedge monitor_if.mnt_cb.sck);
-          tx_data[bit_count] = monitor_if.mnt_cb.mosi;
-          rx_data[bit_count] = monitor_if.mnt_cb.miso;
+          mosi[bit_count] = monitor_if.mnt_cb.mosi;
+          miso[bit_count] = monitor_if.mnt_cb.miso;
           @(negedge monitor_if.mnt_cb.sck);
         end
 
@@ -141,10 +138,10 @@ package spi_agent_pkg;
         wait (monitor_if.mnt_cb.cs_n == 1'b1);
 
         // 解析监听到的数据
-        monitor_trans.read  = (tx_data[31:24] == 8'h01) ? 1'b1 : 1'b0;
-        monitor_trans.wdata = tx_data[15:0];
-        monitor_trans.rdata = rx_data;
-        monitor_trans.addr  = {24'h20_0000, tx_data[23:16]};
+        monitor_trans.read  = (mosi[31:24] == 8'h01) ? 1'b1 : 1'b0;
+        monitor_trans.wdata = mosi[15:0];
+        monitor_trans.rdata = miso;
+        monitor_trans.addr  = {24'h20_0000, mosi[23:16]};
 
         // 将解析后的数据发送到analysis端口
         spi_ap.write(monitor_trans);
@@ -154,7 +151,6 @@ package spi_agent_pkg;
 
   // =========================================================
   // SPI Agent类定义
-  // =========================================================
   class spi_agent extends uvm_agent;
     `uvm_component_utils(spi_agent)
     uvm_analysis_port #(spi_trans) spi_ap;
