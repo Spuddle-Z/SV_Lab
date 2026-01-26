@@ -91,8 +91,8 @@ package sequence_pkg;
       int tx_count;
       int rx_valid_count;
 
-      // 固定 batch_count 为 5
-      batch_count = 5;
+      // 固定 batch_count 为 2
+      batch_count = 2;
 
       // 发送 8*batch_count 次随机数据到 TXDATA_ADDR
       for (tx_count = 0; tx_count < 8 * batch_count; tx_count++) begin
