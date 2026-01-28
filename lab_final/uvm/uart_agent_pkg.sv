@@ -31,7 +31,7 @@ package uart_agent_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       if(!uvm_config_db#(virtual uart_bus.slave)::get(this, "", "vif", active_if)) begin
-        `uvm_fatal("NOVIF", "Virtual interface must be set for: " + get_full_name() + ".vif")
+        `uvm_fatal("NOVIF", "Virtual interface must be set for: uart_driver.vif")
       end
     endfunction : build_phase
 
@@ -88,7 +88,7 @@ package uart_agent_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       if(!uvm_config_db#(virtual uart_bus.master)::get(this, "", "vif", monitor_if)) begin
-        `uvm_fatal("NOVIF", "Virtual interface must be set for: " + get_full_name() + ".vif")
+        `uvm_fatal("NOVIF", "Virtual interface must be set for: uart_monitor.vif")
       end
       uart_ap = new("uart_ap", this);
     endfunction : build_phase

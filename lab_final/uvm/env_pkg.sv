@@ -1,6 +1,7 @@
 package env_pkg;
 
   import uvm_pkg::*;
+  import sequence_pkg::*;
   import spi_agent_pkg::*;
   import uart_agent_pkg::*;
   import scoreboard_pkg::*;

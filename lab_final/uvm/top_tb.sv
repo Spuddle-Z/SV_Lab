@@ -1,9 +1,10 @@
 `timescale 1ns/1ps
 
-import icb_agent_pkg::*;
-import apb_agent_pkg::*;
+import spi_agent_pkg::*;
+import uart_agent_pkg::*;
 import sequence_pkg::*;
 import env_pkg::*;
+import scoreboard_pkg::*;
 import uvm_pkg::*;
 `include "uvm_macros.svh"
 
@@ -24,11 +25,8 @@ module testbench_top();
   logic rst_n;
 
   // interface signals
-  icb_bus   icb(.*);
-  apb_bus   apb0(.*);
-  apb_bus   apb1(.*);
-  apb_bus   apb2(.*);
-  apb_bus   apb3(.*);
+  spi_bus   spi(.*);
+  uart_bus  uart(.*);
 
 //=====================================================================
 // Signals' Function
@@ -45,28 +43,16 @@ module testbench_top();
     rst_n   = 1;
   end
 
-  dut i_dut(
-    // input bus
-    .icb(       icb       ),
-
-    // output bus
-    .apb0(      apb0      ),
-    .apb1(      apb1      ),
-    .apb2(      apb2      ),
-    .apb3(      apb3      )
+  dut_top i_dut(
+    .spi_bus(spi),
+    .uart_bus(uart)
   );
 
   initial begin
-    uvm_config_db#(virtual icb_bus)::set(null, "uvm_test_top.env.icb_agt.icb_drv", "active_channel", icb);
-    uvm_config_db#(virtual icb_bus)::set(null, "uvm_test_top.env.icb_agt.icb_mnt", "monitor_channel", icb);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_0.apb_drv", "active_channel", apb0);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_0.apb_mnt", "monitor_channel", apb0);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_1.apb_drv", "active_channel", apb1);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_1.apb_mnt", "monitor_channel", apb1);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_2.apb_drv", "active_channel", apb2);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_2.apb_mnt", "monitor_channel", apb2);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_3.apb_drv", "active_channel", apb3);
-    uvm_config_db#(virtual apb_bus)::set(null, "uvm_test_top.env.apb_agt_3.apb_mnt", "monitor_channel", apb3);
+    uvm_config_db#(virtual spi_bus.master)::set(null, "uvm_test_top.env.spi_agt.driver", "vif", spi);
+    uvm_config_db#(virtual spi_bus.monitor)::set(null, "uvm_test_top.env.spi_agt.monitor", "vif", spi);
+    uvm_config_db#(virtual uart_bus.slave)::set(null, "uvm_test_top.env.uart_agt.driver", "vif", uart);
+    uvm_config_db#(virtual uart_bus.master)::set(null, "uvm_test_top.env.uart_agt.monitor", "vif", uart);
   end
 
   initial begin

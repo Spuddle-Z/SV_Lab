@@ -31,7 +31,7 @@ package spi_agent_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       if(!uvm_config_db#(virtual spi_bus.master)::get(this, "", "vif", active_if)) begin
-        `uvm_fatal("NOVIF", "Virtual interface must be set for: " + get_full_name() + ".vif")
+        `uvm_fatal("NOVIF", "Virtual interface must be set for: spi_driver.vif")
       end
     endfunction : build_phase
 
@@ -108,7 +108,7 @@ package spi_agent_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       if(!uvm_config_db#(virtual spi_bus.monitor)::get(this, "", "vif", monitor_if)) begin
-        `uvm_fatal("NOVIF", "Virtual interface must be set for: " + get_full_name() + ".vif")
+        `uvm_fatal("NOVIF", "Virtual interface must be set for: spi_monitor.vif")
       end
       spi_ap = new("spi_ap", this);
     endfunction : build_phase
