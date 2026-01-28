@@ -49,7 +49,7 @@ package uart_agent_pkg;
         seq_item_port.get_next_item(tx);
 
         // 驱动事务到接口
-        tx_data = tx.data[7:0];
+        tx_data = tx.data;
 
         // 起始位
         active_if.slv_cb.rx <= 1'b0;

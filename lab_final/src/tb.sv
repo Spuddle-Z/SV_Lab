@@ -68,7 +68,7 @@ module tb_uart_ctl;
 
     rx_full = 1'b0;
     rx      = 1'b1; // 空闲高
-    baud_divisor = 16'd4; // 加快仿真
+    baud_divisor = 16'd16; // 加快仿真
     tx_data = 128'h0;
     data_valid = 1'b0;
     rst_n = 1'b0;
@@ -88,7 +88,7 @@ module tb_uart_ctl;
 
     // 等待 tx_done，设置超时保护
     wait_cycles = 0;
-    while (!tx_done && wait_cycles < 500000) begin
+    while (!tx_done && wait_cycles < 5000000) begin
       @(posedge clk);
       wait_cycles++;
     end

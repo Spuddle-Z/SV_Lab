@@ -1,10 +1,11 @@
 `timescale 1ns/1ps
 
+import sequence_pkg::*;
 import spi_agent_pkg::*;
 import uart_agent_pkg::*;
-import sequence_pkg::*;
-import env_pkg::*;
 import scoreboard_pkg::*;
+import env_pkg::*;
+import test_pkg::*;
 import uvm_pkg::*;
 `include "uvm_macros.svh"
 

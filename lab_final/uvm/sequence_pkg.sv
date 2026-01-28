@@ -24,7 +24,7 @@ package sequence_pkg;
 
   class uart_trans extends uvm_sequence_item;
     `uvm_object_utils(uart_trans)
-    rand logic [15:0] data;
+    rand logic [7:0] data;
     bit is_tx;
   endclass // uart_trans
 
@@ -62,7 +62,7 @@ package sequence_pkg;
       start_item(tx);
         tx.read = 0;
         tx.addr = CTRL_ADDR;
-        tx.wdata = 16'h0001;
+        tx.wdata = 16'h0003;
       finish_item(tx);
 
       // 读控制寄存器
