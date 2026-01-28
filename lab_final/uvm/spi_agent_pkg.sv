@@ -175,6 +175,7 @@ package spi_agent_pkg;
       super.connect_phase(phase);
 
       driver.seq_item_port.connect(sequencer.seq_item_export);
+      spi_ap = monitor.spi_ap;
     endfunction : connect_phase
   endclass : spi_agent
 

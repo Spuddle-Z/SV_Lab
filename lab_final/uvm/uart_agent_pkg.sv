@@ -95,31 +95,57 @@ package uart_agent_pkg;
 
     // 实现监视任务
     virtual task run_phase(uvm_phase phase);
-      uart_trans monitor_trans;
-      byte rx_data;
-      int bit_count;
       localparam int BAUD_DIVISOR = 16'h0036;
 
-      forever begin
-        monitor_trans = uart_trans::type_id::create("monitor_trans");
-        rx_data = 8'h00;
+      fork
+        begin : monitor_tx
+          forever begin
+            uart_trans tx_trans;
+            byte tx_data;
+            int bit_count;
+            tx_trans = uart_trans::type_id::create("tx_trans");
+            tx_data = 8'h00;
 
-        // 等待起始位
-        @(negedge monitor_if.tx);
-        repeat (BAUD_DIVISOR * 24) @(posedge monitor_if.clk);
+            @(negedge monitor_if.tx);
+            repeat (BAUD_DIVISOR * 24) @(posedge monitor_if.clk);
 
-        // 数据位
-        for (bit_count = 0; bit_count < 8; bit_count = bit_count + 1) begin
-          rx_data[bit_count] = monitor_if.tx;
-          repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
+            for (bit_count = 0; bit_count < 8; bit_count = bit_count + 1) begin
+              tx_data[bit_count] = monitor_if.tx;
+              repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
+            end
+
+            repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
+
+            tx_trans.data = tx_data;
+            tx_trans.is_tx = 1'b1;
+            uart_ap.write(tx_trans);
+          end
         end
 
-        // 停止位
-        repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
+        begin : monitor_rx
+          forever begin
+            uart_trans rx_trans;
+            byte rx_data;
+            int bit_count;
+            rx_trans = uart_trans::type_id::create("rx_trans");
+            rx_data = 8'h00;
 
-        monitor_trans.data = rx_data;
-        uart_ap.write(monitor_trans);
-      end
+            @(negedge monitor_if.rx);
+            repeat (BAUD_DIVISOR * 24) @(posedge monitor_if.clk);
+
+            for (bit_count = 0; bit_count < 8; bit_count = bit_count + 1) begin
+              rx_data[bit_count] = monitor_if.rx;
+              repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
+            end
+
+            repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
+
+            rx_trans.data = rx_data;
+            rx_trans.is_tx = 1'b0;
+            uart_ap.write(rx_trans);
+          end
+        end
+      join
     endtask : run_phase
   endclass : uart_monitor
 
@@ -127,6 +153,7 @@ package uart_agent_pkg;
   // UART Agent类定义
   class uart_agent extends uvm_agent;
     `uvm_component_utils(uart_agent)
+    uvm_analysis_port #(uart_trans) uart_ap;
 
     uart_sequencer sequencer;
     uart_driver    driver;
@@ -150,6 +177,7 @@ package uart_agent_pkg;
       super.connect_phase(phase);
 
       driver.seq_item_port.connect(sequencer.seq_item_export);
+      uart_ap = monitor.uart_ap;
     endfunction : connect_phase
   endclass : uart_agent
 

@@ -25,6 +25,7 @@ package sequence_pkg;
   class uart_trans extends uvm_sequence_item;
     `uvm_object_utils(uart_trans)
     rand logic [15:0] data;
+    bit is_tx;
   endclass // uart_trans
 
 
