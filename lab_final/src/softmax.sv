@@ -331,12 +331,11 @@ module softmax_top (
     data_out_n    = data_out;
     rd_en_n       = 1'b0;
     rd_cooldown_n = rd_cooldown;
-    valid_n       = valid;
+    valid_n       = 1'b0;
     sf_start_n    = 1'b0;
 
     case (state)
       ST_FILL: begin
-        valid_n = 1'b0;
         // rd_en 脉冲后插入一个低周期，避免连续高
         if (rd_cooldown)
           rd_cooldown_n = 1'b0;
@@ -355,7 +354,6 @@ module softmax_top (
             state_n = ST_START_SF;
           end else begin
             data_out_n = pack_buffer;
-            valid_n    = 1'b1;
             state_n    = ST_OUTPUT;
           end
         end
@@ -372,7 +370,7 @@ module softmax_top (
         if (sf_done) begin
           pack_buffer_n = sf_data_out;
           data_out_n    = sf_data_out;
-          valid_n       = 1'b1;
+          valid_n       = 1'b1; // 仅在完成时拉高一个周期
           state_n       = ST_OUTPUT;
         end
       end
@@ -381,7 +379,6 @@ module softmax_top (
         // 有效数据保持，等待下游 done
         rd_en_n = 1'b0;
         if (done) begin
-          valid_n       = 1'b0;
           pack_count_n  = '0;
           pack_buffer_n = '0;
           state_n       = ST_FILL;

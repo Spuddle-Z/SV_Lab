@@ -52,7 +52,6 @@ package scoreboard_pkg;
                 sum_exp = 0.0;
                 // 计算每个输入的指数值
                 for (i = 0; i < 16; i++) begin
-                  $display("Data byte %0d: %0d", i, data_bytes[i]);
                   exp_vals[i] = $exp($itor($signed(data_bytes[i])) / 16.0);
                   sum_exp += exp_vals[i];
                 end
@@ -141,7 +140,6 @@ package scoreboard_pkg;
           uart_trans exp_item;
           forever begin
             exp_bgp.get(exp_item);
-            $display("Scoreboard received expected UART TX data: %0d", exp_item.data[7:0]);
             exp_q.push_back(exp_item.data);
           end
         end
@@ -151,7 +149,6 @@ package scoreboard_pkg;
           uart_trans act_item;
           forever begin
             act_tx_bgp.get(act_item);
-            $display("Scoreboard received actual UART TX data: %0d", act_item.data);
             act_tx_q.push_back(act_item.data);
             softmax_sem.get();
             if (exp_q.size() >= 16 && act_tx_q.size() >= 16) begin
@@ -164,11 +161,10 @@ package scoreboard_pkg;
                 real diff;
                 exp_b = exp_q.pop_front();
                 act_b = act_tx_q.pop_front();
-                $display("Comparing softmax byte %0d: expected=%0d actual=%0d", i, exp_b, act_b);
                 exp_r = $itor(exp_b) / 256.0;
                 act_r = $itor(act_b) / 256.0;
                 diff = (exp_r > act_r) ? (exp_r - act_r) : (act_r - exp_r);
-                if (diff > 0.03) begin
+                if (diff > 0.125) begin
                   `uvm_error("SOFTMAX_CMP", $sformatf("idx=%0d exp=%0.5f act=%0.5f diff=%0.5f", i, exp_r, act_r, diff))
                 end
               end

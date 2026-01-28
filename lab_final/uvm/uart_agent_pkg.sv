@@ -109,12 +109,10 @@ package uart_agent_pkg;
             @(negedge monitor_if.tx);
             repeat (BAUD_DIVISOR * 24) @(posedge monitor_if.clk);
 
-            for (bit_count = 0; bit_count < 8; bit_count = bit_count + 1) begin
+            for (bit_count = 0; bit_count < 8; bit_count++) begin
               tx_data[bit_count] = monitor_if.tx;
               repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
             end
-
-            repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
 
             tx_trans.data = tx_data;
             tx_trans.is_tx = 1'b1;
@@ -133,12 +131,10 @@ package uart_agent_pkg;
             @(negedge monitor_if.rx);
             repeat (BAUD_DIVISOR * 24) @(posedge monitor_if.clk);
 
-            for (bit_count = 0; bit_count < 8; bit_count = bit_count + 1) begin
+            for (bit_count = 0; bit_count < 8; bit_count++) begin
               rx_data[bit_count] = monitor_if.rx;
               repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
             end
-
-            repeat (BAUD_DIVISOR * 16) @(posedge monitor_if.clk);
 
             rx_trans.data = rx_data;
             rx_trans.is_tx = 1'b0;
