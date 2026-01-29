@@ -19,7 +19,7 @@ module tb_uart_ctl;
   logic [127:0] tx_data;
   logic        data_valid;
   logic        tx_done;
-  logic [15:0] rx_data;
+  logic [31:0] rx_data;
   logic        rx_full;
   logic        rx_fifo_en;
 

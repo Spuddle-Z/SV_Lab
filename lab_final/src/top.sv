@@ -35,8 +35,8 @@ module dut_top(
   logic        tx_fifo_empty;
   logic        tx_fifo_wr_en;
   logic        tx_fifo_rd_en;
-  logic [15:0] rx_fifo_wr;
-  logic [15:0] rx_fifo_rd;
+  logic [31:0] rx_fifo_wr;
+  logic [31:0] rx_fifo_rd;
   logic        rx_fifo_full;
   logic        rx_fifo_empty;
   logic        rx_fifo_wr_en;
@@ -139,7 +139,7 @@ module dut_top(
   );
 
   // RX FIFO
-  fifo rx_fifo_inst (
+  fifo #(.DATA_WIDTH(32)) rx_fifo_inst (
     .rst_n(rst_n),
     .rd_clk(clk),
     .wr_clk(clk),

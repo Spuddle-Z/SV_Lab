@@ -240,7 +240,7 @@ module uart_ctl (
   output logic tx_done,
   
   // RX接口（连接到外部RX FIFO）
-  output logic [15:0] rx_data,
+  output logic [31:0] rx_data,
   input logic rx_full,
   output logic rx_fifo_en
 );
@@ -286,8 +286,8 @@ module uart_ctl (
   rx_state_t rx_state;
   logic [127:0] tx_data_reg;
   logic [4:0]   tx_byte_idx; // 0..15
-  logic [15:0] rx_data_reg;
-  logic rx_byte_count;
+  logic [31:0] rx_data_reg;
+  logic [1:0] rx_byte_count;
 
   // 发送控制逻辑：data_valid 触发发送 16 个字节，逐字节握手 uart_tx
   always_ff @(posedge clk or negedge rst_n) begin
@@ -339,10 +339,10 @@ module uart_ctl (
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         rx_state <= RX_RECV;
-        rx_data_reg <= 16'b0;
-        rx_byte_count <= 1'b0;
+        rx_data_reg <= 32'b0;
+        rx_byte_count <= 2'b0;
         rx_fifo_en <= 1'b0;
-        rx_data <= 16'b0;
+        rx_data <= 32'b0;
     end else begin
       rx_fifo_en <= 1'b0;
 
@@ -350,15 +350,17 @@ module uart_ctl (
         RX_RECV: begin
           if (rx_done) begin
             case (rx_byte_count)
-              1'b0: rx_data_reg[7:0] <= rx_byte;
-              1'b1: rx_data_reg[15:8] <= rx_byte;
+              2'd0: rx_data_reg[7:0] <= rx_byte;
+              2'd1: rx_data_reg[15:8] <= rx_byte;
+              2'd2: rx_data_reg[23:16] <= rx_byte;
+              2'd3: rx_data_reg[31:24] <= rx_byte;
             endcase
 
-            if (rx_byte_count == 1'b1) begin
-              rx_byte_count <= 1'b0;
+            if (rx_byte_count == 2'd3) begin
+              rx_byte_count <= 2'd0;
               rx_state <= RX_END;
             end else begin
-              rx_byte_count <= rx_byte_count + 1;
+              rx_byte_count <= rx_byte_count + 1'b1;
             end
           end
         end

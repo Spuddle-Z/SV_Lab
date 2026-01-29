@@ -1,4 +1,6 @@
-module fifo(
+module fifo #(
+  parameter int DATA_WIDTH = 16
+)(
   // 时钟信号
   input  logic rst_n,   // 复位信号
   input  logic rd_clk,  // 读时钟
@@ -9,12 +11,12 @@ module fifo(
   output logic full,
 
   // 接口信号
-  output logic [15:0] rd_data,
+  output logic [DATA_WIDTH-1:0] rd_data,
   input  logic rd_en,
-  input  logic [15:0] wr_data,
+  input  logic [DATA_WIDTH-1:0] wr_data,
   input  logic wr_en
 );
-  logic [15:0] mem [0:7];
+  logic [DATA_WIDTH-1:0] mem [0:7];
   logic [3:0] wr_ptr, rd_ptr;
   logic [3:0] wr_ptr_gray, rd_ptr_gray;
   logic [3:0] rd_ptr_gray_sync1, rd_ptr_gray_sync2;
