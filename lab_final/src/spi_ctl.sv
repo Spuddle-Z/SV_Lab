@@ -104,9 +104,9 @@ module ctrl_reg (
   output logic [15:0] tx_fifo_data,
   input  logic        tx_fifo_full,
   output logic        tx_fifo_en,
-  input  logic [31:0] reg_data,
-  output logic        reg_done,
-  input  logic        reg_ready,
+  input  logic [31:0] rx_fifo_data,
+  input  logic        rx_fifo_empty,
+  output logic        rx_fifo_en,
 
   // UART控制信号
   input  logic [3:0]  state,
@@ -151,10 +151,10 @@ module ctrl_reg (
       spi_tx_data <= 32'b0;
       rx_reg_valid <= 1'b0;
       tx_fifo_en <= 1'b0;
-      reg_done <= 1'b0;
+      rx_fifo_en <= 1'b0;
     end else begin // 处理接收到的数据
       tx_fifo_en <= 1'b0;
-      reg_done <= 1'b0;
+      rx_fifo_en <= 1'b0;
       if (spi_tx_done)
         rx_reg_valid <= 1'b0;
       if (spi_rx_done) begin
@@ -176,7 +176,7 @@ module ctrl_reg (
               STATE: spi_tx_data <= {28'b0, state_reg};
               RX_DATA: begin
                 spi_tx_data <= rx_data_reg;
-                reg_done <= 1'b1;
+                rx_fifo_en <= 1'b1;
               end
               BAUD: spi_tx_data <= {16'b0, baud_reg};
             endcase
@@ -192,8 +192,8 @@ module ctrl_reg (
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       rx_data_reg <= 32'b0;
-    end else if (reg_ready) begin
-      rx_data_reg <= reg_data;
+    end else if (rx_fifo_en) begin
+      rx_data_reg <= rx_fifo_empty ? 32'h0 : rx_fifo_data;
     end
   end
 
@@ -202,63 +202,6 @@ module ctrl_reg (
   // ============================================================================
   assign control = control_reg;
   assign baud = baud_reg;
-
-endmodule
-
-module rx_fifo_req (
-  input  logic        clk,
-  input  logic        rst_n,
-  
-  // RX FIFO 接口
-  input  logic [31:0] rx_fifo_data,
-  input  logic        rx_fifo_empty,
-  output logic        rx_fifo_en,
-
-  // 控制寄存器接口
-  input  logic        reg_done,
-  output logic [31:0] reg_data,
-  output logic        reg_ready
-);
-
-  typedef enum logic [1:0] { IDLE, READ, WAIT } state_t;
-  logic [31:0] reg_data_buf;
-  state_t state;
-
-  // RX FIFO 写使能逻辑
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      rx_fifo_en <= 1'b0;
-      reg_data_buf <= 32'b0;
-      reg_data <= 32'b0;
-      reg_ready <= 1'b0;
-      state <= IDLE;
-    end else begin
-      case (state)
-        IDLE: begin
-          rx_fifo_en <= 1'b0;
-          reg_ready <= 1'b0;
-          if (reg_req) begin
-            if (rx_fifo_empty) begin
-              reg_data <= 32'b0;
-            end else begin
-              rx_fifo_en <= 1'b1;
-              reg_data_buf <= rx_fifo_data;
-              state <= READ;
-            end
-          end
-        end
-        READ: begin
-          rx_fifo_en <= 1'b0;
-          state <= WAIT;
-        end
-        WAIT: begin
-          reg_ready <= 1'b1;
-          reg_data <= reg_data_buf;
-          state <= IDLE;
-        end
-      endcase
-    end
-  end
 
 endmodule
 
@@ -298,11 +241,6 @@ module spi_ctl (
   logic        rx_reg_valid;
   logic        spi_tx_done;
 
-  // 控制寄存器与req接口
-  logic [31:0] reg_data;
-  logic        reg_done;
-  logic        reg_ready;
-
   // ============================================================================
   // DUT实例化
   // ============================================================================
@@ -335,26 +273,13 @@ module spi_ctl (
     .tx_fifo_data(tx_fifo_data),
     .tx_fifo_full(tx_fifo_full),
     .tx_fifo_en(tx_fifo_en),
-    .reg_data(reg_data),
-    .reg_done(reg_done),
-    .reg_ready(reg_ready),
-
-    .state(state),
-    .control(control),
-    .baud(baud)
-  );
-
-  rx_fifo_req rx_fifo_req_inst (
-    .clk(clk),
-    .rst_n(rst_n),
-
     .rx_fifo_data(rx_fifo_data),
     .rx_fifo_empty(rx_fifo_empty),
     .rx_fifo_en(rx_fifo_en),
 
-    .reg_done(reg_done),
-    .reg_data(reg_data),
-    .reg_ready(reg_ready)
+    .state(state),
+    .control(control),
+    .baud(baud)
   );
 
 endmodule
