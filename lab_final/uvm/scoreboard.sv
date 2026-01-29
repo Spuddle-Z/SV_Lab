@@ -123,6 +123,9 @@ package scoreboard_pkg;
       act_spi_bgp = new("act_spi_bgp", this);
     endfunction : build_phase
 
+    int pass_cnt = 0;
+    int total_cnt = 0;
+
     virtual task run_phase(uvm_phase phase);
       byte exp_q[$];
       byte act_tx_q[$];
@@ -153,6 +156,7 @@ package scoreboard_pkg;
             softmax_sem.get();
             if (exp_q.size() >= 16 && act_tx_q.size() >= 16) begin
               int i;
+              logic all_pass = 1;
               for (i = 0; i < 16; i++) begin
                 logic [7:0] exp_b;
                 logic [7:0] act_b;
@@ -166,8 +170,11 @@ package scoreboard_pkg;
                 diff = (exp_r > act_r) ? (exp_r - act_r) : (act_r - exp_r);
                 if (diff > 0.125) begin
                   `uvm_error("SOFTMAX_CMP", $sformatf("idx=%0d exp=%0.5f act=%0.5f diff=%0.5f", i, exp_r, act_r, diff))
+                  all_pass = 0;
                 end
               end
+              if (all_pass) pass_cnt++;
+              total_cnt++;
             end
             softmax_sem.put();
           end
@@ -204,13 +211,24 @@ package scoreboard_pkg;
               spi_word = spi_q.pop_front();
               if (uart_word !== spi_word) begin
                 `uvm_error("UART_SPI_CMP", $sformatf("uart=%08x spi=%08x", uart_word, spi_word))
+              end else begin
+                pass_cnt++;
               end
+              total_cnt++;
             end
             rx_spi_sem.put();
           end
         end
       join
     endtask : run_phase
+
+    virtual function void final_phase(uvm_phase phase);
+      super.final_phase(phase);
+      $display("--------------------- [SCOREBOARD] --------------------");
+      $display("|     Pass / Total : %d / %d        |" , pass_cnt,total_cnt);
+      $display("|     Pass Rate : %f%%                         |", pass_cnt*100.0/total_cnt);
+      $display("------------------------------------------------------");
+    endfunction : final_phase
   endclass : my_scoreboard
 
 endpackage

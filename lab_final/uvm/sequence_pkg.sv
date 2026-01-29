@@ -137,8 +137,7 @@ package sequence_pkg;
         rx_item = uart_trans::type_id::create("rx_item");
         rx_item.randomize();
         rx_item.is_tx = 1'b0; // RX 事务
-        $display("UART Sequence sending RX data: %h", rx_item.data);
-        
+
         start_item(rx_item);
         finish_item(rx_item);
       end

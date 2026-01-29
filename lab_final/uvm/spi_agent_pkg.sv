@@ -139,7 +139,6 @@ package spi_agent_pkg;
 
         // 忽略高阻态数据
         if (miso != 32'h0) begin
-          $display("SPI Monitor captured MOSI: %h, MISO: %h", mosi, miso);
 
           // 解析监听到的数据
           monitor_trans.read  = (mosi[31:24] == 8'h01) ? 1'b1 : 1'b0;

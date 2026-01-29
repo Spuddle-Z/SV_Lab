@@ -44,7 +44,6 @@ package test_pkg;
         uart_seq.start(env.uart_agt.sequencer);
       join
 
-      $display("Test completed.");
       phase.drop_objection(this);
     endtask : run_phase
   endclass : my_test
