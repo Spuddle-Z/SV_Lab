@@ -36,6 +36,7 @@ package test_pkg;
 
       // 启动SPI寄存器操作序列
       spi_reg_seq.start(env.spi_agt.sequencer);
+
       fork
         // 启动SPI数据传输序列
         spi_data_seq.start(env.spi_agt.sequencer);
@@ -43,6 +44,7 @@ package test_pkg;
         uart_seq.start(env.uart_agt.sequencer);
       join
 
+      $display("Test completed.");
       phase.drop_objection(this);
     endtask : run_phase
   endclass : my_test

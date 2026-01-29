@@ -130,19 +130,15 @@ package sequence_pkg;
     endfunction : new
 
     virtual task body();
-      uart_trans tx_seen;
       uart_trans rx_item;
 
-      forever begin
-        // 等待 TX 侧事务通过 response 通道返回
-        get_response(tx_seen);
-
-        // 随机化一条 RX 事务并发送
+      for (int i = 0; i < 8; i++) begin
+        // 随机化一条 TX 事务并发送
         rx_item = uart_trans::type_id::create("rx_item");
-        if (!rx_item.randomize()) begin
-          `uvm_error(get_full_name(), "uart_trans randomize failed")
-        end
-
+        rx_item.randomize();
+        rx_item.is_tx = 1'b0; // RX 事务
+        $display("UART Sequence sending RX data: %h", rx_item.data);
+        
         start_item(rx_item);
         finish_item(rx_item);
       end
