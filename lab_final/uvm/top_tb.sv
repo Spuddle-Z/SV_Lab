@@ -29,6 +29,18 @@ module testbench_top();
   spi_bus   spi(.*);
   uart_bus  uart(.*);
 
+  // Signals for binding
+  logic [1:0] tx_state;
+  logic [1:0] rx_state;
+  logic baud_tick;
+
+  // FIFO signals
+  logic tx_fifo_rst_n, tx_fifo_rd_clk, tx_fifo_wr_clk, tx_fifo_empty, tx_fifo_full, tx_fifo_wr_en, tx_fifo_rd_en;
+  logic [3:0] tx_fifo_rd_ptr, tx_fifo_wr_ptr;
+
+  logic rx_fifo_rst_n, rx_fifo_rd_clk, rx_fifo_wr_clk, rx_fifo_empty, rx_fifo_full, rx_fifo_wr_en, rx_fifo_rd_en;
+  logic [3:0] rx_fifo_rd_ptr, rx_fifo_wr_ptr;
+
 //=====================================================================
 // Signals' Function
 //=====================================================================
@@ -48,6 +60,33 @@ module testbench_top();
     .spi_bus(spi),
     .uart_bus(uart)
   );
+
+  // Assignments for binding
+  assign tx_state = i_dut.uart_ctl_inst.state[3:2];
+  assign rx_state = i_dut.uart_ctl_inst.state[1:0];
+  assign baud_tick = i_dut.uart_ctl_inst.baud_tick;
+
+  assign tx_fifo_rst_n = i_dut.tx_fifo_inst.rst_n;
+  assign tx_fifo_rd_clk = i_dut.tx_fifo_inst.rd_clk;
+  assign tx_fifo_wr_clk = i_dut.tx_fifo_inst.wr_clk;
+  assign tx_fifo_empty = i_dut.tx_fifo_inst.empty;
+  assign tx_fifo_full = i_dut.tx_fifo_inst.full;
+  assign tx_fifo_wr_en = i_dut.tx_fifo_inst.wr_en;
+  assign tx_fifo_rd_en = i_dut.tx_fifo_inst.rd_en;
+  assign tx_fifo_rd_ptr = i_dut.tx_fifo_inst.rd_ptr;
+  assign tx_fifo_wr_ptr = i_dut.tx_fifo_inst.wr_ptr;
+
+  assign rx_fifo_rst_n = i_dut.rx_fifo_inst.rst_n;
+  assign rx_fifo_rd_clk = i_dut.rx_fifo_inst.rd_clk;
+  assign rx_fifo_wr_clk = i_dut.rx_fifo_inst.wr_clk;
+  assign rx_fifo_empty = i_dut.rx_fifo_inst.empty;
+  assign rx_fifo_full = i_dut.rx_fifo_inst.full;
+  assign rx_fifo_wr_en = i_dut.rx_fifo_inst.wr_en;
+  assign rx_fifo_rd_en = i_dut.rx_fifo_inst.rd_en;
+  assign rx_fifo_rd_ptr = i_dut.rx_fifo_inst.rd_ptr;
+  assign rx_fifo_wr_ptr = i_dut.rx_fifo_inst.wr_ptr;
+
+  binding_module i_binding_module();
 
   initial begin
     uvm_config_db#(virtual spi_bus.master)::set(null, "uvm_test_top.env.spi_agt.driver", "vif", spi);

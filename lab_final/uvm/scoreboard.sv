@@ -171,7 +171,6 @@ package scoreboard_pkg;
               pass_cnt++;
             end
             total_cnt++;
-            $display("Softmax Comparison: Pass %0d / Total %0d", pass_cnt, total_cnt);
             softmax_sem.put();
           end
         end
@@ -211,7 +210,6 @@ package scoreboard_pkg;
                 pass_cnt++;
               end
               total_cnt++;
-              $display("UART-SPI Comparison: Pass %0d / Total %0d", pass_cnt, total_cnt);
             end
             rx_spi_sem.put();
           end
