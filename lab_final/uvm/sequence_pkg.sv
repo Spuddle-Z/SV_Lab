@@ -58,6 +58,19 @@ package sequence_pkg;
         tx.addr = BAUD_ADDR;
       finish_item(tx);
 
+      // 写状态寄存器
+      start_item(tx);
+        tx.read = 0;
+        tx.addr = STAT_ADDR;
+        tx.wdata = 16'h0000; // Clear status
+      finish_item(tx);
+
+      // 读状态寄存器
+      start_item(tx);
+        tx.read = 1;
+        tx.addr = STAT_ADDR;
+      finish_item(tx);
+
       // 写控制寄存器，启用UART，启用Softmax
       start_item(tx);
         tx.read = 0;
@@ -71,10 +84,30 @@ package sequence_pkg;
         tx.addr = CTRL_ADDR;
       finish_item(tx);
 
-      // 读状态寄存器
+      // 写TXDATA寄存器
+      start_item(tx);
+        tx.read = 0;
+        tx.addr = TXDATA_ADDR;
+        tx.wdata = 16'hABCD; // Example data
+      finish_item(tx);
+
+      // 读TXDATA寄存器
       start_item(tx);
         tx.read = 1;
-        tx.addr = STAT_ADDR;
+        tx.addr = TXDATA_ADDR;
+      finish_item(tx);
+
+      // 写RXDATA寄存器
+      start_item(tx);
+        tx.read = 0;
+        tx.addr = RXDATA_ADDR;
+        tx.wdata = 16'h0000; // Dummy write
+      finish_item(tx);
+
+      // 读RXDATA寄存器
+      start_item(tx);
+        tx.read = 1;
+        tx.addr = RXDATA_ADDR;
       finish_item(tx);
     endtask : body
   endclass : spi_reg_sequence
@@ -92,6 +125,20 @@ package sequence_pkg;
       int tx_count;
       int rx_valid_count;
 
+      // 先设置波特率与控制寄存器
+      tx = spi_trans::type_id::create("baud_tx");
+      start_item(tx);
+        tx.read = 0; // write
+        tx.addr = BAUD_ADDR;
+        tx.wdata = 16'h0036; // Set baud rate 
+      finish_item(tx);
+      tx = spi_trans::type_id::create("ctrl_tx");
+      start_item(tx);
+        tx.read = 0; // write
+        tx.addr = CTRL_ADDR;
+        tx.wdata = 16'h0003; // Enable UART and Softmax
+      finish_item(tx);
+
       // 固定 batch_count 为 2
       batch_count = 2;
 
@@ -104,6 +151,9 @@ package sequence_pkg;
           tx.wdata = $urandom(); // 随机 16bit 数据
         finish_item(tx);
       end
+
+      // 等待一段时间，确保数据被处理
+      #3_000_000;
 
       // 持续读取 RXDATA_ADDR，直到收到 4*batch_count 次有效数据 (rdata != 0)
       rx_valid_count = 0;

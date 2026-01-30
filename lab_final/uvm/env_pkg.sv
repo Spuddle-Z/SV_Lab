@@ -5,6 +5,7 @@ package env_pkg;
   import spi_agent_pkg::*;
   import uart_agent_pkg::*;
   import scoreboard_pkg::*;
+  import subscriber_pkg::*;
   `include "uvm_macros.svh"
 
   // =========================================================
@@ -17,6 +18,7 @@ package env_pkg;
     uart_agent uart_agt;
     my_model mdl;
     my_scoreboard scb;
+    spi_subscriber spi_sub;
 
     // 实例化通信fifo
     uvm_tlm_analysis_fifo #(spi_trans) spi_mdl_fifo;
@@ -39,6 +41,7 @@ package env_pkg;
       uart_agt = uart_agent::type_id::create("uart_agt", this);
       mdl = my_model::type_id::create("mdl", this);
       scb = my_scoreboard::type_id::create("scb", this);
+      spi_sub = spi_subscriber::type_id::create("spi_sub", this);
 
       // 实例化fifo
       spi_mdl_fifo = new("spi_mdl_fifo", this);
@@ -55,6 +58,7 @@ package env_pkg;
 
       // 连接SPI agent与UART agent的analysis端口到model的fifo
       spi_agt.spi_ap.connect(spi_mdl_fifo.analysis_export);
+      spi_agt.spi_ap.connect(spi_sub.analysis_export);
       mdl.spi_bgp.connect(spi_mdl_fifo.blocking_get_export);
       uart_agt.uart_ap.connect(uart_mdl_fifo.analysis_export);
       mdl.uart_bgp.connect(uart_mdl_fifo.blocking_get_export);
