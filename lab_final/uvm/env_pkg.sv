@@ -19,6 +19,7 @@ package env_pkg;
     my_model mdl;
     my_scoreboard scb;
     spi_subscriber spi_sub;
+    uart_subscriber uart_sub;
 
     // 实例化通信fifo
     uvm_tlm_analysis_fifo #(spi_trans) spi_mdl_fifo;
@@ -41,7 +42,10 @@ package env_pkg;
       uart_agt = uart_agent::type_id::create("uart_agt", this);
       mdl = my_model::type_id::create("mdl", this);
       scb = my_scoreboard::type_id::create("scb", this);
+
+      // 实例化subscriber
       spi_sub = spi_subscriber::type_id::create("spi_sub", this);
+      uart_sub = uart_subscriber::type_id::create("uart_sub", this);
 
       // 实例化fifo
       spi_mdl_fifo = new("spi_mdl_fifo", this);
@@ -61,6 +65,7 @@ package env_pkg;
       spi_agt.spi_ap.connect(spi_sub.analysis_export);
       mdl.spi_bgp.connect(spi_mdl_fifo.blocking_get_export);
       uart_agt.uart_ap.connect(uart_mdl_fifo.analysis_export);
+      uart_agt.uart_ap.connect(uart_sub.analysis_export);
       mdl.uart_bgp.connect(uart_mdl_fifo.blocking_get_export);
 
       mdl.exp_uart_ap.connect(exp_uart_fifo.analysis_export);
