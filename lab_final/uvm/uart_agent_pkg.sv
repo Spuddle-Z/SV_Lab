@@ -117,9 +117,9 @@ package uart_agent_pkg;
 
             tx_trans.data = tx_data;
             tx_trans.is_tx = 1'b1;
-            uart_ap.write(tx_trans);
             tx_count++;
             $display("UART TX monitor received %0d transactions, data=%0h", tx_count, tx_data);
+            uart_ap.write(tx_trans);
           end
         end
 

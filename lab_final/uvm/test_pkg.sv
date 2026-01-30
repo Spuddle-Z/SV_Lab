@@ -31,7 +31,7 @@ package test_pkg;
       spi_data_seq = spi_data_sequence::type_id::create("spi_data_seq", this);
       uart_seq = uart_sequence::type_id::create("uart_seq", this);
 
-      phase.phase_done.set_drain_time(this, 1000ns);
+      phase.phase_done.set_drain_time(this, 100000000); // 设置phase结束的排水时间
       phase.raise_objection(this);  // 提出objection，表示test还在运行
 
       // 启动SPI寄存器操作序列
@@ -49,8 +49,6 @@ package test_pkg;
         $display("UART Sequence completed.");
         end
       join
-
-      #500000;
 
       phase.drop_objection(this);
     endtask : run_phase

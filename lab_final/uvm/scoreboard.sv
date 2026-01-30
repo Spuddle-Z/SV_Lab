@@ -224,7 +224,7 @@ package scoreboard_pkg;
       $display("--------------------- [SCOREBOARD] --------------------");
       $display("|     Pass / Total : %d / %d        |" , pass_cnt,total_cnt);
       $display("|     Pass Rate : %f%%                         |", pass_cnt*100.0/total_cnt);
-      $display("------------------------------------------------------");
+      $display("-------------------------------------------------------");
     endfunction : final_phase
   endclass : my_scoreboard
 
