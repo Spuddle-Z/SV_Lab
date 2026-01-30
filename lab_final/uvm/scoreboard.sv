@@ -76,7 +76,7 @@ package scoreboard_pkg;
             end
 
             // 处理读RXDATA_ADDR的事务，转发到scoreboard
-            if (spi_item.read && spi_item.addr == RXDATA_ADDR) begin
+            if (spi_item.read && spi_item.addr == RXDATA_ADDR && spi_item.rdata !== 32'h0) begin
               spi_trans spi_read_item;
               spi_read_item = spi_trans::type_id::create("spi_read_item");
               spi_read_item.read = spi_item.read;
@@ -151,31 +151,27 @@ package scoreboard_pkg;
           // 收集实际的UART TX数据，并与期望值比较softmax结果
           uart_trans act_item;
           forever begin
+            logic [7:0] exp_b;
+            logic [7:0] act_b;
+            real exp_r;
+            real act_r;
+            real diff;
+
             act_tx_bgp.get(act_item);
             act_tx_q.push_back(act_item.data);
             softmax_sem.get();
-            if (exp_q.size() >= 16 && act_tx_q.size() >= 16) begin
-              int i;
-              logic all_pass = 1;
-              for (i = 0; i < 16; i++) begin
-                logic [7:0] exp_b;
-                logic [7:0] act_b;
-                real exp_r;
-                real act_r;
-                real diff;
-                exp_b = exp_q.pop_front();
-                act_b = act_tx_q.pop_front();
-                exp_r = $itor(exp_b) / 256.0;
-                act_r = $itor(act_b) / 256.0;
-                diff = (exp_r > act_r) ? (exp_r - act_r) : (act_r - exp_r);
-                if (diff > 0.125) begin
-                  `uvm_error("SOFTMAX_CMP", $sformatf("idx=%0d exp=%0.5f act=%0.5f diff=%0.5f", i, exp_r, act_r, diff))
-                  all_pass = 0;
-                end
-              end
-              if (all_pass) pass_cnt++;
-              total_cnt++;
+            exp_b = exp_q.pop_front();
+            act_b = act_tx_q.pop_front();
+            exp_r = $itor(exp_b) / 256.0;
+            act_r = $itor(act_b) / 256.0;
+            diff = (exp_r > act_r) ? (exp_r - act_r) : (act_r - exp_r);
+            if (diff > 0.125) begin
+              `uvm_error("SOFTMAX_CMP", $sformatf("exp=%0.5f act=%0.5f diff=%0.5f", exp_r, act_r, diff))
+            end else begin
+              pass_cnt++;
             end
+            total_cnt++;
+            $display("Softmax Comparison: Pass %0d / Total %0d", pass_cnt, total_cnt);
             softmax_sem.put();
           end
         end
@@ -215,6 +211,7 @@ package scoreboard_pkg;
                 pass_cnt++;
               end
               total_cnt++;
+              $display("UART-SPI Comparison: Pass %0d / Total %0d", pass_cnt, total_cnt);
             end
             rx_spi_sem.put();
           end

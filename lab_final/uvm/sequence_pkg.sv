@@ -132,7 +132,7 @@ package sequence_pkg;
     virtual task body();
       uart_trans rx_item;
 
-      for (int i = 0; i < 8; i++) begin
+      for (int i = 0; i < 32; i++) begin
         // 随机化一条 TX 事务并发送
         rx_item = uart_trans::type_id::create("rx_item");
         rx_item.randomize();

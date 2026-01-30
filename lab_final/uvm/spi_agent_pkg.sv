@@ -137,18 +137,14 @@ package spi_agent_pkg;
         // 等待片选信号拉高，表示传输结束
         wait (monitor_if.mnt_cb.cs_n == 1'b1);
 
-        // 忽略高阻态数据
-        if (miso != 32'h0) begin
+        // 解析监听到的数据
+        monitor_trans.read  = (mosi[31:24] == 8'h01) ? 1'b1 : 1'b0;
+        monitor_trans.wdata = mosi[15:0];
+        monitor_trans.rdata = miso;
+        monitor_trans.addr  = {24'h20_0000, mosi[23:16]};
 
-          // 解析监听到的数据
-          monitor_trans.read  = (mosi[31:24] == 8'h01) ? 1'b1 : 1'b0;
-          monitor_trans.wdata = mosi[15:0];
-          monitor_trans.rdata = miso;
-          monitor_trans.addr  = {24'h20_0000, mosi[23:16]};
-
-          // 将解析后的数据发送到analysis端口
-          spi_ap.write(monitor_trans);
-        end
+        // 将解析后的数据发送到analysis端口
+        spi_ap.write(monitor_trans);
       end
     endtask : run_phase
   endclass : spi_monitor

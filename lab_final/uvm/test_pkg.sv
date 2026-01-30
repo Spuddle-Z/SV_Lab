@@ -38,11 +38,19 @@ package test_pkg;
       spi_reg_seq.start(env.spi_agt.sequencer);
 
       fork
+        begin
         // 启动SPI数据传输序列
         spi_data_seq.start(env.spi_agt.sequencer);
+        $display("SPI Data Sequence completed.");
+        end
+        begin
         // 启动UART数据传输序列
         uart_seq.start(env.uart_agt.sequencer);
+        $display("UART Sequence completed.");
+        end
       join
+
+      #500000;
 
       phase.drop_objection(this);
     endtask : run_phase

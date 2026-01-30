@@ -99,6 +99,7 @@ package uart_agent_pkg;
 
       fork
         begin : monitor_tx
+          int tx_count = 0;
           forever begin
             uart_trans tx_trans;
             byte tx_data;
@@ -117,6 +118,8 @@ package uart_agent_pkg;
             tx_trans.data = tx_data;
             tx_trans.is_tx = 1'b1;
             uart_ap.write(tx_trans);
+            tx_count++;
+            $display("UART TX monitor received %0d transactions, data=%0h", tx_count, tx_data);
           end
         end
 
